@@ -127,6 +127,18 @@
   #bannerMain.hit{color:#9dff8f;text-shadow:0 0 22px rgba(120,255,140,.9),0 0 5px #000;}
   #bannerMain.miss{color:#ff6a4d;text-shadow:0 0 22px rgba(255,90,60,.85),0 0 5px #000;}
   #bannerMain.gold{color:#ffd24d;text-shadow:0 0 26px rgba(255,210,70,.95),0 0 6px #000;}
+  #bannerMain.headshot{
+    color:#ff3b3b;
+    font-size:34px;
+    letter-spacing:8px;
+    text-shadow:0 0 30px rgba(255,60,60,1), 0 0 12px rgba(255,180,60,.9), 0 0 4px #000;
+    animation:headshotPop .5s ease-out;
+  }
+  @keyframes headshotPop{
+    0%   { transform:scale(.6); opacity:0; }
+    50%  { transform:scale(1.15); opacity:1; }
+    100% { transform:scale(1); opacity:1; }
+  }
   #bannerSub{margin-top:7px;font-size:12px;letter-spacing:2px;color:#cfe8a8;text-shadow:0 0 10px rgba(0,0,0,.9),0 0 3px #000;}
 
   @media (max-width:980px){
@@ -136,6 +148,7 @@
     .anemo-compass{width:34px;height:34px;flex:0 0 34px;}
     .anemo-speed{font-size:16px;}
     #bannerMain{font-size:19px;letter-spacing:4px;}
+    #bannerMain.headshot{font-size:24px;letter-spacing:5px;}
     .tc{top:auto;bottom:14px;left:50%;transform:translateX(-50%);}
     input[type=number]{width:60px;font-size:14px;}
   }
@@ -264,10 +277,15 @@ const ZERO_D   = 600;
 const TIME_MAX = 60;
 const MAX_SHOTS_PER_TARGET = 5;
 
-/* ---------- TIGHT HIT ZONES (in metres) ---------- */
 const HIT_ZONE = {
   STANDING: { halfH: 0.65, halfW: 0.32 },
   PRONE:    { halfH: 0.30, halfW: 0.42 }
+};
+
+/* Head zones (metres) — measured from target ground base */
+const HEAD_ZONE = {
+  STANDING: { cyFromTop: 0.11, r: 0.13 },  // head center at 11% down from top, radius 13cm
+  PRONE:    { cyFromGround: 0.75, r: 0.12 } // prone head center 75% up, radius 12cm
 };
 
 const PHASE = { RANGE:'RANGE', WIND:'WIND', SOLUTION:'SOLUTION',
@@ -304,12 +322,13 @@ const S = {
   panX: 0, panY: 0,
 
   time: TIME_MAX,
-  shots: 0, hits: 0, score: 0,
+  shots: 0, hits: 0, headshots: 0, score: 0,
   shotsOnTarget: 0,
 
   bullet: null,
   impactFx: null,
   flash: 0,
+  headshotFlash: 0,
   muzzleFlash: 0,
 
   tx: 0, ty: 0, th: 0,
@@ -432,6 +451,7 @@ function newRound(){
   S.bullet = null;
   S.impactFx = null;
   S.flash = 0;
+  S.headshotFlash = 0;
   S.muzzleFlash = 0;
   S.anemoTime     = 0;
   S.anemoCurrent  = 0;
@@ -458,7 +478,6 @@ function lockRange(){
     S.phase = PHASE.WIND;
     updatePhaseUI();
   } else {
-    /* SPOT phase — just confirm the new value in place */
     els.compHint.textContent = 'RANGE UPDATED → ' + S.estRange + ' M — RE-FIRE WHEN READY';
     els.compHint.classList.add('hot');
   }
@@ -493,14 +512,10 @@ function updatePhaseUI(){
   els.fire.disabled      = !canFire;
   els.next.disabled      = !canNext;
 
-  /* Editable inputs get amber outline */
   els.range.classList.toggle('editable', canEditRange && p === PHASE.SPOT);
   els.windIn.classList.toggle('editable', canEditWind && p === PHASE.SPOT);
-
-  /* Highlight the whole computer panel during SPOT */
   els.compPanel.classList.toggle('editing', p === PHASE.SPOT);
 
-  /* FIRE button text + class */
   els.fire.textContent = (p === PHASE.SPOT) ? 'RE-FIRE' : 'FIRE';
   els.fire.classList.toggle('refire', p === PHASE.SPOT);
 
@@ -540,11 +555,13 @@ function timeout(){
   if (S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT) fire();
 }
 
+/* =========================================================
+   FIRE  —  hit + headshot detection
+   ========================================================= */
 function fire(){
   if (S.phase !== PHASE.SOLUTION && S.phase !== PHASE.SPOT) return;
   S.phase = PHASE.FIRING;
 
-  /* Re-read current inputs so any edits during SPOT are honoured */
   readRange();
   readWind();
 
@@ -565,19 +582,45 @@ function fire(){
   const h        = S.stance.height * ppm;
   const targetCY = groundY - h / 2;
 
-  /* ---------- Tightened hit zone ---------- */
+  /* ---------- Body hit zone ---------- */
   const z = (S.stance === STANCES.PRONE) ? HIT_ZONE.PRONE : HIT_ZONE.STANDING;
   const halfH = Math.max(4, z.halfH * ppm);
   const halfW = Math.max(4, z.halfW * ppm);
 
   const dx = impactX - targetCX;
   const dy = impactY - targetCY;
-  const hit = (Math.abs(dx) < halfW && Math.abs(dy) < halfH);
+  const bodyHit = (Math.abs(dx) < halfW && Math.abs(dy) < halfH);
+
+  /* ---------- Headshot zone ---------- */
+  let headshot = false;
+  let headCX = 0, headCY = 0, headR = 0;
+
+  if (S.stance === STANCES.STANDING) {
+    /* Head at top of the standing figure */
+    const hz = HEAD_ZONE.STANDING;
+    headCY = groundY - h + hz.cyFromTop * h;
+    headR  = hz.r * ppm;
+    headCX = targetCX;
+  } else {
+    /* Prone — head sits 75% of total height up from ground */
+    const hz = HEAD_ZONE.PRONE;
+    headCY = groundY - hz.cyFromGround * h;
+    headR  = hz.r * ppm * 2.2;   // visual head is larger on prone
+    headCX = targetCX;
+  }
+
+  const hdx = impactX - headCX;
+  const hdy = impactY - headCY;
+  const headHit = Math.hypot(hdx, hdy) < headR;
+
+  const hit = bodyHit || headHit;
+  if (hit && headHit) headshot = true;
 
   S.tx = targetCX; S.ty = targetCY; S.th = h;
   S.pendingResult = {
-    hit, dx, dy, impactX, impactY,
-    targetCX, targetCY, halfH, halfW
+    hit, headshot, dx, dy, impactX, impactY,
+    targetCX, targetCY, halfH, halfW,
+    headCX, headCY, headR
   };
 
   const p0 = { x: W / 2, y: H + 80 };
@@ -603,6 +646,7 @@ function onBulletLanded(){
 
   if (R.hit){
     S.hits++;
+    if (R.headshot) S.headshots++;
     resolveTarget(true);
   } else if (S.shotsOnTarget >= MAX_SHOTS_PER_TARGET){
     resolveTarget(false);
@@ -625,7 +669,6 @@ function enterSpotPhase(){
   if (Math.abs(dxMil) > 0.05) dirs.push(Math.abs(dxMil).toFixed(1) + ' MIL ' + (dxMil > 0 ? 'RIGHT' : 'LEFT'));
   const impactLine = dirs.length ? 'IMPACT ' + dirs.join(' · ') : 'IMPACT UNOBSERVED';
 
-  /* Spotter's recommended adjustment */
   const hints = [];
   if (dyMil >  0.05) hints.push('INCREASE RANGE ESTIMATE');
   if (dyMil < -0.05) hints.push('DECREASE RANGE ESTIMATE');
@@ -645,7 +688,7 @@ function enterSpotPhase(){
   els.banner.classList.add('show');
 
   S.impactFx = {
-    t: 0, x: R.impactX, y: R.impactY, hit: false,
+    t: 0, x: R.impactX, y: R.impactY, hit: false, headshot: false,
     parts: Array.from({length: 10}, () => ({
       x: 0, y: 0,
       vx: (Math.random() - 0.5) * 80,
@@ -667,20 +710,34 @@ function resolveTarget(hit){
   const rangePts = Math.max(0, 100 - rangeErr * 1.6);
   const windPts  = Math.max(0, 100 - windErr * 14);
   const hitPts   = hit ? 100 : 0;
+  const headBonus = R.headshot ? 50 : 0;
 
   const shotPenalty = Math.max(0.25, 1 - (S.shotsOnTarget - 1) * 0.30);
-  const raw = rangePts * 0.40 + windPts * 0.20 + hitPts * 0.40;
+  const raw = rangePts * 0.40 + windPts * 0.20 + hitPts * 0.40 + headBonus;
   const total = Math.round(raw * shotPenalty);
 
   S.score += total;
 
-  let label, cls, subExtra = '';
-  if (hit){
-    if (rangeErr <= 15 && windErr <= 1.0 && S.shotsOnTarget === 1){ label = 'DIRECT HIT'; cls = 'gold'; }
-    else if (S.shotsOnTarget === 1){ label = 'HIT'; cls = 'hit'; }
-    else { label = 'HIT · SHOT ' + S.shotsOnTarget; cls = 'hit'; }
+  let label = '', cls = '', subExtra = '';
+
+  if (R.headshot){
+    label = 'HEADSHOT · KILL';
+    cls = 'headshot';
+    S.headshotFlash = 1;
+  } else if (hit){
+    if (rangeErr <= 15 && windErr <= 1.0 && S.shotsOnTarget === 1){
+      label = 'DIRECT HIT · KILL';
+      cls = 'gold';
+    } else if (S.shotsOnTarget === 1){
+      label = 'HIT · KILL';
+      cls = 'hit';
+    } else {
+      label = 'HIT · SHOT ' + S.shotsOnTarget;
+      cls = 'hit';
+    }
   } else {
-    label = 'TARGET LOST'; cls = 'miss';
+    label = 'TARGET LOST';
+    cls = 'miss';
     const dy = R.dy, dx = R.dx;
     if (Math.abs(dy) > R.halfH) subExtra = dy > 0 ? ' · LOW' : ' · HIGH';
     else if (Math.abs(dx) > R.halfW) subExtra = dx > 0 ? ' · RIGHT' : ' · LEFT';
@@ -688,26 +745,51 @@ function resolveTarget(hit){
 
   els.bMain.textContent = label;
   els.bMain.className   = cls;
+
+  const bonusTxt = R.headshot ? '  ·  HEADSHOT +50' : '';
   els.bSub.textContent  =
     'RNG ERR ' + Math.round(rangeErr) + ' M  ·  WND ERR ' +
     windErr.toFixed(1) + ' M/S' + subExtra +
-    '  ·  +' + total + ' PTS' +
+    '  ·  +' + total + ' PTS' + bonusTxt +
     (S.shotsOnTarget > 1 ? '  (' + S.shotsOnTarget + ' SHOTS)' : '');
   els.banner.classList.add('show');
 
-  if (hit){
+  /* ---------- Impact FX: headshot vs normal ---------- */
+  if (R.headshot){
+    /* Bigger, red-and-gold burst for headshot */
     S.impactFx = {
-      t: 0, x: R.impactX, y: R.impactY, hit: true,
+      t: 0, x: R.impactX, y: R.impactY,
+      hit: true, headshot: true,
+      parts: Array.from({length: 26}, () => {
+        const ang = Math.random() * Math.PI * 2;
+        const sp  = 60 + Math.random() * 140;
+        return {
+          x: 0, y: 0,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp - 40,
+          life: 1,
+          col: Math.random() < 0.5 ? 'red' : 'gold'
+        };
+      })
+    };
+  } else if (hit){
+    /* Normal impact puff */
+    S.impactFx = {
+      t: 0, x: R.impactX, y: R.impactY,
+      hit: true, headshot: false,
       parts: Array.from({length: 14}, () => ({
         x: 0, y: 0,
         vx: (Math.random() - 0.5) * 100,
         vy: -Math.random() * 80 - 10,
-        life: 1
+        life: 1,
+        col: 'dust'
       }))
     };
   }
 
-  els.compHint.textContent = 'TARGET RESOLVED — LOAD NEXT TARGET';
+  els.compHint.textContent = R.headshot
+    ? 'HEADSHOT CONFIRMED — TARGET ELIMINATED'
+    : (hit ? 'TARGET NEUTRALIZED — LOAD NEXT TARGET' : 'TARGET LOST — LOAD NEXT TARGET');
   els.compHint.classList.remove('hot');
   updatePhaseUI();
 }
@@ -793,11 +875,12 @@ function update(dt){
       p.vy += 220 * dt;
       p.life -= dt * 1.5;
     }
-    if (S.impactFx.t > 1.6) S.impactFx = null;
+    if (S.impactFx.t > 1.8) S.impactFx = null;
   }
 
-  if (S.flash > 0)       S.flash = Math.max(0, S.flash - dt * 3.2);
-  if (S.muzzleFlash > 0) S.muzzleFlash = Math.max(0, S.muzzleFlash - dt * 9);
+  if (S.flash > 0)         S.flash = Math.max(0, S.flash - dt * 3.2);
+  if (S.headshotFlash > 0) S.headshotFlash = Math.max(0, S.headshotFlash - dt * 2.4);
+  if (S.muzzleFlash > 0)   S.muzzleFlash = Math.max(0, S.muzzleFlash - dt * 9);
 
   els.zoom.textContent    = S.zoom.toFixed(1) + 'X';
   els.time.textContent    = S.time.toFixed(1);
@@ -1079,7 +1162,6 @@ function drawReticle(cx, cy){
     dot(cx, cy + dy, 2.4);
   }
 
-  /* STANDING LADDER (right) */
   const x0   = cx + 34;
   const gapL = Math.max(34, 42 - (z - 4) * 0.8);
 
@@ -1112,7 +1194,6 @@ function drawReticle(cx, cy){
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.fillText('STANDING +X', x0 - 6, cy - 92 * (z / 4));
 
-  /* PRONE LADDER on −Y AXIS, top→bottom: 4 → 6 → 8 */
   const PRONE_RANGES = [400, 600, 800];
   const markSpacing  = [55, 120, 195];
 
@@ -1257,34 +1338,75 @@ function drawBullet(){
   ctx.restore();
 }
 
+/* =========================================================
+   IMPACT FX — different for headshot vs body kill vs miss
+   ========================================================= */
 function drawImpact(){
   if (!S.impactFx) return;
   const fx = S.impactFx;
   const k = Math.min(1, fx.t / 0.45);
 
   ctx.save();
+
+  /* Expanding ring */
   ctx.globalAlpha = (1 - k) * 0.85;
-  ctx.strokeStyle = fx.hit ? 'rgba(255,90,60,0.95)' : 'rgba(220,210,180,0.9)';
-  ctx.lineWidth = 2.5;
+  if (fx.headshot)       ctx.strokeStyle = 'rgba(255,60,60,0.95)';
+  else if (fx.hit)       ctx.strokeStyle = 'rgba(255,90,60,0.95)';
+  else                   ctx.strokeStyle = 'rgba(220,210,180,0.9)';
+  ctx.lineWidth = fx.headshot ? 3.5 : 2.5;
   ctx.beginPath();
-  ctx.arc(fx.x, fx.y, 6 + k * 46, 0, Math.PI * 2);
+  ctx.arc(fx.x, fx.y, 6 + k * (fx.headshot ? 80 : 46), 0, Math.PI * 2);
   ctx.stroke();
 
+  /* Second ring for headshot */
+  if (fx.headshot){
+    ctx.globalAlpha = (1 - k) * 0.7;
+    ctx.strokeStyle = 'rgba(255,200,80,0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, 6 + k * 120, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  /* Central flash */
   ctx.globalAlpha = Math.max(0, 1 - fx.t / 1.4) * 0.55;
-  ctx.fillStyle = fx.hit ? 'rgba(190,80,60,1)' : 'rgba(205,195,170,1)';
+  if (fx.headshot)       ctx.fillStyle = 'rgba(255,60,60,1)';
+  else if (fx.hit)       ctx.fillStyle = 'rgba(190,80,60,1)';
+  else                   ctx.fillStyle = 'rgba(205,195,170,1)';
   ctx.beginPath();
-  ctx.arc(fx.x, fx.y, 4 + k * 16, 0, Math.PI * 2);
+  ctx.arc(fx.x, fx.y, 4 + k * (fx.headshot ? 28 : 16), 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.globalAlpha = 0.8;
+  /* Particles */
   for (const p of fx.parts){
     if (p.life <= 0) continue;
-    ctx.globalAlpha = p.life * 0.85;
-    ctx.fillStyle = fx.hit ? 'rgba(255,110,70,1)' : 'rgba(200,190,165,1)';
+    ctx.globalAlpha = p.life * 0.95;
+
+    if (fx.headshot && p.col === 'red'){
+      ctx.fillStyle = 'rgba(255,70,70,1)';
+      ctx.shadowColor = 'rgba(255,80,60,0.9)';
+      ctx.shadowBlur = 12;
+    } else if (fx.headshot && p.col === 'gold'){
+      ctx.fillStyle = 'rgba(255,210,80,1)';
+      ctx.shadowColor = 'rgba(255,200,80,0.9)';
+      ctx.shadowBlur = 12;
+    } else if (fx.hit){
+      ctx.fillStyle = 'rgba(255,110,70,1)';
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = 'rgba(200,190,165,1)';
+      ctx.shadowBlur = 0;
+    }
+
+    const radius = fx.headshot
+      ? (2.2 + p.life * 3.5)
+      : (1.6 + p.life * 2);
+
     ctx.beginPath();
-    ctx.arc(fx.x + p.x, fx.y + p.y, 1.6 + p.life * 2, 0, Math.PI * 2);
+    ctx.arc(fx.x + p.x, fx.y + p.y, radius, 0, Math.PI * 2);
     ctx.fill();
   }
+
   ctx.restore();
 }
 
@@ -1413,6 +1535,19 @@ function draw(time, dt){
     ctx.save();
     ctx.globalAlpha = S.flash * 0.30;
     ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  /* Red radial flash on headshot */
+  if (S.headshotFlash > 0){
+    ctx.save();
+    ctx.globalAlpha = S.headshotFlash * 0.55;
+    const g = ctx.createRadialGradient(cx, cy, 40, cx, cy, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(255,60,60,0.9)');
+    g.addColorStop(0.5, 'rgba(255,90,40,0.35)');
+    g.addColorStop(1, 'rgba(255,40,40,0)');
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
