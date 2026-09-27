@@ -2,23 +2,59 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>STADIAMETRIC RANGEFINDER · SNIPER TRAINER</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>3D SNIPER TRAINER · STADIAMETRIC RANGEFINDER</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{
-    width:100%;height:100%;overflow:hidden;background:#000;
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;
     font-family:"Courier New",Courier,monospace;
-    -webkit-user-select:none;user-select:none;
-  }
+    -webkit-user-select:none;user-select:none;touch-action:none;position:fixed;}
   #stage{position:fixed;inset:0;overflow:hidden;background:#05070a;cursor:crosshair;}
-  #scene{position:absolute;inset:0;display:block;width:100%;height:100%;}
+  #three-root{position:absolute;inset:0;}
+  #three-root canvas{display:block;}
+  #reticleCanvas{position:absolute;inset:0;pointer-events:none;}
 
   .layer{position:absolute;inset:0;pointer-events:none;}
-  .tint{background:radial-gradient(ellipse at 50% 45%, rgba(150,255,170,.09), rgba(0,25,0,.16) 65%, rgba(0,0,0,.38)); mix-blend-mode:overlay;}
+  .tint{background:radial-gradient(ellipse at 50% 45%, rgba(150,255,170,.06), rgba(0,25,0,.12) 65%, rgba(0,0,0,.32)); mix-blend-mode:overlay;transition:opacity .25s;}
   .scan{background:repeating-linear-gradient(to bottom, rgba(0,0,0,.42) 0 1px, rgba(0,0,0,0) 1px 3px); opacity:.42; mix-blend-mode:multiply;}
   .vig{background:radial-gradient(ellipse 62% 62% at 50% 50%, rgba(0,0,0,0) 36%, rgba(0,0,0,.30) 58%, rgba(0,0,0,.90) 80%, #000 95%);}
   .glow{background:radial-gradient(ellipse 72% 72% at 50% 50%, rgba(120,255,140,.05), transparent 70%);}
+
+  #modeTint{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;}
+  #modeTint.thermal{
+    opacity:1;
+    background:
+      radial-gradient(ellipse 95% 95% at 50% 50%, rgba(0,0,0,0) 30%, rgba(0,0,0,.65) 100%),
+      linear-gradient(180deg, rgba(255,120,50,.10), rgba(255,60,20,.22));
+    mix-blend-mode:multiply;
+  }
+  #modeTint.thermal::after{
+    content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(to bottom, rgba(255,200,120,.06) 0 2px, transparent 2px 7px);
+    mix-blend-mode:overlay;
+    animation:thermalScan 5s linear infinite;
+  }
+  @keyframes thermalScan{0%{background-position-y:0;}100%{background-position-y:70px;}}
+  #modeTint.night{
+    opacity:1;
+    background:
+      radial-gradient(ellipse 95% 95% at 50% 50%, rgba(0,0,0,0) 26%, rgba(0,0,0,.82) 100%),
+      linear-gradient(180deg, rgba(40,255,140,.24), rgba(10,140,60,.40));
+    mix-blend-mode:multiply;
+  }
+  #modeTint.night::after{
+    content:'';position:absolute;inset:0;
+    background:
+      radial-gradient(circle at 22% 30%, rgba(60,255,140,.14), transparent 25%),
+      radial-gradient(circle at 78% 70%, rgba(60,255,140,.11), transparent 25%);
+    mix-blend-mode:screen;
+    animation:nightFlicker 5.5s infinite;
+  }
+  @keyframes nightFlicker{
+    0%,100%{opacity:.95;}48%{opacity:1;}50%{opacity:.55;}52%{opacity:1;}
+    85%{opacity:1;}87%{opacity:.7;}90%{opacity:1;}
+  }
 
   #hud{
     position:absolute;inset:0;pointer-events:none;
@@ -29,172 +65,202 @@
     background:linear-gradient(180deg,rgba(16,24,12,.88),rgba(6,10,6,.94));
     border:1px solid rgba(150,200,90,.35);
     box-shadow:0 0 0 1px rgba(0,0,0,.75), inset 0 0 22px rgba(120,220,90,.07), 0 6px 26px rgba(0,0,0,.65);
-    padding:9px 11px;border-radius:2px;
+    padding:8px 10px;border-radius:2px;
     text-shadow:0 0 6px rgba(120,255,120,.35);
     transition:border-color .25s, box-shadow .25s;
   }
-  .panel.editing{
-    border-color:rgba(255,190,80,.85);
+  .panel.editing{border-color:rgba(255,190,80,.85);
     box-shadow:0 0 0 1px rgba(0,0,0,.75), inset 0 0 26px rgba(255,190,80,.16),
                0 0 22px rgba(255,190,80,.35);
-    animation:editPulse 1.4s ease-in-out infinite;
-  }
+    animation:editPulse 1.4s ease-in-out infinite;}
   @keyframes editPulse{
     0%,100% { box-shadow:0 0 0 1px rgba(0,0,0,.75), inset 0 0 26px rgba(255,190,80,.16), 0 0 22px rgba(255,190,80,.35); }
     50%     { box-shadow:0 0 0 1px rgba(0,0,0,.75), inset 0 0 26px rgba(255,190,80,.28), 0 0 32px rgba(255,190,80,.55); }
   }
-  .tl{top:14px;left:14px;min-width:196px;}
-  .tr{top:14px;right:14px;min-width:168px;}
-  .tc{top:14px;left:50%;transform:translateX(-50%);min-width:214px;}
-  .ml{top:50%;left:14px;transform:translateY(-50%);min-width:192px;}
-  .bl{bottom:14px;left:14px;min-width:392px;}
-  .br{bottom:14px;right:14px;min-width:238px;}
+  .tl{top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));min-width:172px;}
+  .tr{top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));min-width:172px;}
+  .tc{top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);min-width:200px;}
+  .ml{top:50%;left:max(8px,env(safe-area-inset-left));transform:translateY(-50%);min-width:186px;}
+  .bl{bottom:max(8px,env(safe-area-inset-bottom));left:max(8px,env(safe-area-inset-left));min-width:340px;}
+  .br{bottom:max(8px,env(safe-area-inset-bottom));right:max(8px,env(safe-area-inset-right));min-width:224px;}
 
-  .title{color:#ffbe4d;font-size:10px;letter-spacing:3px;border-bottom:1px dashed rgba(150,200,90,.30);padding-bottom:4px;margin-bottom:6px;}
-  .row{display:flex;justify-content:space-between;gap:14px;line-height:1.6;}
+  .title{color:#ffbe4d;font-size:9px;letter-spacing:3px;border-bottom:1px dashed rgba(150,200,90,.30);padding-bottom:3px;margin-bottom:5px;}
+  .row{display:flex;justify-content:space-between;gap:12px;line-height:1.55;font-size:11px;}
   .row span{color:#6b8a52;}
   .row b{color:#ffbe4d;font-weight:normal;text-shadow:0 0 8px rgba(255,190,80,.5);}
-  .row b.big{font-size:16px;}
-  .row b.ok{color:#9dff8f;text-shadow:0 0 8px rgba(120,255,140,.6);}
-  .hint{color:#5d7a48;font-size:9px;letter-spacing:1px;margin-top:6px;line-height:1.4;}
-  .hint.hot{color:#ffbe4d;text-shadow:0 0 8px rgba(255,190,80,.5);}
-
-  .bar{height:6px;background:rgba(0,0,0,.65);border:1px solid rgba(150,200,90,.30);margin-top:4px;}
+  .row b.big{font-size:15px;}
+  .row b.ok{color:#9dff8f;}
+  .row b.sel{color:#5ae6ff;text-shadow:0 0 10px rgba(90,230,255,.7);}
+  .hint{color:#5d7a48;font-size:9px;letter-spacing:1px;margin-top:5px;line-height:1.35;}
+  .hint.hot{color:#ffbe4d;}
+  .bar{height:5px;background:rgba(0,0,0,.65);border:1px solid rgba(150,200,90,.30);margin-top:4px;}
   .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#9dff8f,#ffbe4d);transition:width .12s linear;}
 
-  .zoomRow{display:flex;gap:5px;}
-  .zoomRow button{flex:1;padding:6px 3px;font-size:10px;}
+  .zoomRow,.modeRow{display:flex;gap:4px;}
+  .zoomRow{margin-bottom:4px;}
+  .zoomRow button{flex:1;padding:7px 3px;font-size:10px;min-height:34px;}
+  .modeRow button{flex:1;padding:7px 3px;font-size:9px;min-height:34px;letter-spacing:.6px;}
+  .modeRow button.day.active{color:#ffd24d;border-color:#ffd24d;}
+  .modeRow button.thermal.active{color:#ff8a5c;border-color:#ff8a5c;box-shadow:0 0 12px rgba(255,140,90,.6);}
+  .modeRow button.night.active{color:#4dff88;border-color:#4dff88;box-shadow:0 0 12px rgba(80,255,140,.6);}
 
   button{
-    font-family:inherit;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;
+    font-family:inherit;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
     background:linear-gradient(180deg,#1d2a15,#0c1408);color:#9dff8f;
-    border:1px solid rgba(150,200,90,.35);padding:6px 10px;cursor:pointer;
+    border:1px solid rgba(150,200,90,.35);padding:8px 10px;cursor:pointer;
     border-radius:2px;text-shadow:0 0 6px rgba(120,255,120,.4);
     transition:background .12s,color .12s,box-shadow .12s,border-color .12s;
+    min-height:38px;touch-action:manipulation;
   }
-  button:hover:not(:disabled){background:linear-gradient(180deg,#2c4020,#131f0c);color:#fff;box-shadow:0 0 14px rgba(120,255,120,.35);}
+  button:hover:not(:disabled){background:linear-gradient(180deg,#2c4020,#131f0c);color:#fff;}
   button:active:not(:disabled){transform:translateY(1px);}
-  button.active{background:linear-gradient(180deg,#3d5522,#1b2b10);color:#ffbe4d;border-color:#ffbe4d;box-shadow:0 0 14px rgba(255,190,80,.45);}
+  button.active{background:linear-gradient(180deg,#3d5522,#1b2b10);color:#ffbe4d;border-color:#ffbe4d;}
   button:disabled{opacity:.28;cursor:not-allowed;}
-  button.wide{width:100%;margin-top:7px;padding:8px;}
+  button.wide{width:100%;margin-top:6px;padding:9px;font-size:11px;}
   button.fire{background:linear-gradient(180deg,#4a1c10,#2a0e06);color:#ff8a5c;border-color:rgba(255,120,60,.55);}
-  button.fire:hover:not(:disabled){background:linear-gradient(180deg,#6b2816,#3a1208);color:#fff;box-shadow:0 0 16px rgba(255,110,50,.5);}
-  button.refire{
-    background:linear-gradient(180deg,#5a4a10,#2a2006);
-    color:#ffd24d;border-color:rgba(255,210,80,.75);
-    box-shadow:0 0 18px rgba(255,210,80,.4);
-    animation:refirePulse 1.2s ease-in-out infinite;
-  }
-  @keyframes refirePulse{
-    0%,100% { box-shadow:0 0 14px rgba(255,210,80,.35); }
-    50%     { box-shadow:0 0 26px rgba(255,210,80,.7); }
-  }
+  button.refire{background:linear-gradient(180deg,#5a4a10,#2a2006);color:#ffd24d;border-color:rgba(255,210,80,.75);
+    animation:refirePulse 1.2s ease-in-out infinite;}
+  @keyframes refirePulse{0%,100%{box-shadow:0 0 14px rgba(255,210,80,.35);}50%{box-shadow:0 0 26px rgba(255,210,80,.7);}}
+  button.change{background:linear-gradient(180deg,#1a2e40,#0a1620);color:#5ae6ff;border-color:rgba(90,230,255,.6);}
 
-  .crow{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
-  .crow label{width:52px;color:#6b8a52;font-size:10px;letter-spacing:1px;}
-  .crow .unit{color:#6b8a52;font-size:10px;min-width:26px;}
-  .crow button{padding:5px 7px;font-size:9px;letter-spacing:1px;}
+  .crow{display:flex;align-items:center;gap:5px;margin-bottom:5px;flex-wrap:wrap;}
+  .crow label{width:46px;color:#6b8a52;font-size:10px;letter-spacing:1px;flex-shrink:0;}
+  .crow .unit{color:#6b8a52;font-size:10px;min-width:22px;}
+  .crow button{padding:6px 6px;font-size:9px;min-height:34px;}
 
   input[type=number]{
     background:#08120a;border:1px solid rgba(150,200,90,.35);
-    color:#ffbe4d;font-family:inherit;font-size:16px;padding:3px 6px;
+    color:#ffbe4d;font-family:inherit;font-size:15px;padding:4px 6px;
     text-align:right;letter-spacing:1px;outline:none;border-radius:2px;
-    text-shadow:0 0 8px rgba(255,190,80,.6);width:76px;
-    transition:border-color .2s, box-shadow .2s;
+    text-shadow:0 0 8px rgba(255,190,80,.6);width:66px;-moz-appearance:textfield;
   }
   input[type=number]:focus{border-color:#ffbe4d;box-shadow:0 0 12px rgba(255,190,80,.30);}
   input[type=number]:disabled{opacity:.35;}
   input[type=number].editable{border-color:rgba(255,190,80,.75);box-shadow:0 0 10px rgba(255,190,80,.25);}
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-  input[type=number]{-moz-appearance:textfield;}
 
-  .anemo-wrap{display:flex;align-items:center;gap:10px;margin:5px 0 7px;}
-  .anemo-compass{flex:0 0 44px;width:44px;height:44px;}
+  .anemo-wrap{display:flex;align-items:center;gap:8px;margin:4px 0 5px;}
+  .anemo-compass{flex:0 0 42px;width:42px;height:42px;}
   .anemo-readout{flex:1;min-width:0;}
-  .anemo-speed{font-size:21px;color:#ffbe4d;letter-spacing:0.5px;text-shadow:0 0 10px rgba(255,190,80,.6);line-height:1;font-weight:bold;}
-  .anemo-speed span{font-size:10px;color:#6b8a52;letter-spacing:1px;font-weight:normal;}
-  .anemo-dir{font-size:10px;color:#9dff8f;letter-spacing:1.5px;margin-top:5px;}
-  .anemo-bar{height:5px;margin-top:5px;}
+  .anemo-speed{font-size:19px;color:#ffbe4d;line-height:1;font-weight:bold;}
+  .anemo-speed span{font-size:10px;color:#6b8a52;font-weight:normal;}
+  .anemo-dir{font-size:10px;color:#9dff8f;letter-spacing:1.4px;margin-top:4px;}
+  .anemo-bar{height:5px;margin-top:4px;}
   .anemo-bar i{background:linear-gradient(90deg,#9dff8f,#ffbe4d 60%,#ff6a4d);transition:width .1s linear;}
 
-  #banner{
-    position:absolute;left:50%;top:26%;transform:translate(-50%,-50%);
+  #banner{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);
     text-align:center;opacity:0;transition:opacity .22s;white-space:nowrap;pointer-events:none;
-  }
+    z-index:100;max-width:96vw;}
   #banner.show{opacity:1;}
-  #bannerMain{font-size:26px;letter-spacing:6px;color:#ffbe4d;text-shadow:0 0 22px rgba(255,180,60,.85), 0 0 5px #000;}
-  #bannerMain.hit{color:#9dff8f;text-shadow:0 0 22px rgba(120,255,140,.9),0 0 5px #000;}
-  #bannerMain.miss{color:#ff6a4d;text-shadow:0 0 22px rgba(255,90,60,.85),0 0 5px #000;}
-  #bannerMain.gold{color:#ffd24d;text-shadow:0 0 26px rgba(255,210,70,.95),0 0 6px #000;}
-  #bannerMain.headshot{
-    color:#ff3b3b;
-    font-size:34px;
-    letter-spacing:8px;
-    text-shadow:0 0 30px rgba(255,60,60,1), 0 0 12px rgba(255,180,60,.9), 0 0 4px #000;
-    animation:headshotPop .5s ease-out;
-  }
-  @keyframes headshotPop{
-    0%   { transform:scale(.6); opacity:0; }
-    50%  { transform:scale(1.15); opacity:1; }
-    100% { transform:scale(1); opacity:1; }
-  }
-  #bannerSub{margin-top:7px;font-size:12px;letter-spacing:2px;color:#cfe8a8;text-shadow:0 0 10px rgba(0,0,0,.9),0 0 3px #000;}
+  #bannerMain{font-size:24px;letter-spacing:5px;color:#ffbe4d;text-shadow:0 0 22px rgba(255,180,60,.85), 0 0 5px #000;}
+  #bannerMain.hit{color:#9dff8f;}
+  #bannerMain.miss{color:#ff6a4d;}
+  #bannerMain.gold{color:#ffd24d;}
+  #bannerMain.headshot{color:#ff3b3b;font-size:30px;letter-spacing:6px;
+    animation:headshotPop .5s ease-out;}
+  @keyframes headshotPop{0%{transform:scale(.6);opacity:0;}50%{transform:scale(1.15);opacity:1;}100%{transform:scale(1);opacity:1;}}
+  #bannerSub{margin-top:6px;font-size:11px;letter-spacing:1.8px;color:#cfe8a8;white-space:normal;}
 
-  @media (max-width:980px){
+  #lockHint{
+    position:absolute;left:50%;bottom:12%;
+    transform:translateX(-50%);
+    background:rgba(20,30,15,.88);
+    border:1px solid rgba(150,200,90,.6);
+    padding:10px 16px;border-radius:3px;
+    color:#9dff8f;font-size:12px;letter-spacing:2px;
+    text-shadow:0 0 8px rgba(120,255,120,.4);
+    pointer-events:none;
+    opacity:0;transition:opacity .3s;
+    z-index:200;
+    text-align:center;
+  }
+  #lockHint.show{opacity:1;}
+  #lockHint .k{
+    display:inline-block;
+    background:rgba(90,230,255,.15);
+    border:1px solid rgba(90,230,255,.5);
+    color:#5ae6ff;
+    padding:1px 7px;
+    border-radius:2px;
+    margin:0 3px;
+    font-weight:bold;
+    font-size:11px;
+  }
+
+  #panPad{position:absolute;right:max(12px,env(safe-area-inset-right));
+    bottom:calc(max(12px,env(safe-area-inset-bottom)) + 260px);
+    display:none;grid-template-columns:42px 42px 42px;grid-template-rows:42px 42px 42px;
+    gap:3px;pointer-events:auto;opacity:.5;z-index:50;}
+  #panPad button{width:42px;height:42px;padding:0;font-size:16px;line-height:1;
+    background:rgba(10,18,8,.6);border:1px solid rgba(150,200,90,.5);
+    color:#9dff8f;border-radius:4px;touch-action:manipulation;min-height:42px;}
+  #panPad button:active{background:rgba(60,90,30,.75);}
+  @media (hover:none) and (pointer:coarse){#panPad{display:grid;}}
+
+  @media (max-width:820px), (orientation:portrait){
     #hud{font-size:10px;}
-    .tl{min-width:150px;} .tr{min-width:132px;} .bl{min-width:300px;} .br{min-width:180px;}
-    .ml{min-width:150px;font-size:10px;}
-    .anemo-compass{width:34px;height:34px;flex:0 0 34px;}
-    .anemo-speed{font-size:16px;}
-    #bannerMain{font-size:19px;letter-spacing:4px;}
-    #bannerMain.headshot{font-size:24px;letter-spacing:5px;}
-    .tc{top:auto;bottom:14px;left:50%;transform:translateX(-50%);}
-    input[type=number]{width:60px;font-size:14px;}
+    .tl{min-width:130px;} .tr{min-width:140px;} .ml{min-width:132px;}
+    .bl{min-width:0;left:max(6px,env(safe-area-inset-left));right:max(6px,env(safe-area-inset-right));
+        bottom:calc(max(6px,env(safe-area-inset-bottom)) + 130px);}
+    .br{min-width:0;left:max(6px,env(safe-area-inset-left));right:max(6px,env(safe-area-inset-right));
+        bottom:max(6px,env(safe-area-inset-bottom));}
+    .tc{display:none;}
+    .row{font-size:10px;}
+    .anemo-compass{width:32px;height:32px;flex:0 0 32px;}
+    #bannerMain{font-size:19px;}
+    #bannerMain.headshot{font-size:22px;}
   }
 </style>
 </head>
 <body>
 <div id="stage">
-  <canvas id="scene"></canvas>
-  <div class="layer tint"></div>
-  <div class="layer scan"></div>
-  <div class="layer vig"></div>
-  <div class="layer glow"></div>
+  <div id="three-root"></div>
+  <canvas id="reticleCanvas"></canvas>
+  <div class="layer tint" id="tintLayer"></div>
+  <div class="layer scan" id="scanLayer"></div>
+  <div class="layer vig" id="vigLayer"></div>
+  <div class="layer glow" id="glowLayer"></div>
+  <div id="modeTint"></div>
 
   <div id="hud">
     <div class="panel tl">
       <div class="title">◤ MISSION ◢</div>
       <div class="row"><span>OPTIC</span><b id="uiZoom">4.0X</b></div>
-      <div class="row"><span>PHASE</span><b id="uiPhase">RANGE</b></div>
-      <div class="row"><span>STANCE</span><b id="uiStance">STANDING</b></div>
-      <div class="row"><span>SHOT #</span><b id="uiShotNo">1</b></div>
+      <div class="row"><span>PHASE</span><b id="uiPhase">SELECT</b></div>
+      <div class="row"><span>STANCE</span><b id="uiStance">--</b></div>
+      <div class="row"><span>TARGETS</span><b id="uiTargets">5</b></div>
     </div>
 
     <div class="panel tr">
-      <div class="title">◤ MAGNIFICATION ◢</div>
+      <div class="title">◤ OPTICS ◢</div>
       <div class="zoomRow" id="zoomRow">
         <button data-z="0" class="active">4X</button>
-        <button data-z="1">8X</button>
-        <button data-z="2">12X</button>
+        <button data-z="1">12X</button>
+        <button data-z="2">30X</button>
       </div>
-      <div class="hint">CLICK TO CHANGE MAG</div>
+      <div class="modeRow" id="modeRow">
+        <button data-m="day" class="day active">DAY</button>
+        <button data-m="thermal" class="thermal">THRM</button>
+        <button data-m="night" class="night">N/V</button>
+      </div>
+      <div class="hint" id="lockStatus">TAB = LOCK · SPACE = SCOPE</div>
     </div>
 
     <div class="panel tc">
-      <div class="row"><span>TIME</span><b id="uiTime">60.0</b></div>
+      <div class="row"><span>TIME</span><b id="uiTime">120.0</b></div>
       <div class="bar"><i id="timeBar"></i></div>
     </div>
 
     <div class="panel ml">
       <div class="title">◤ ANEMOMETER ◢</div>
       <div class="anemo-wrap">
-        <svg class="anemo-compass" viewBox="0 0 40 40" width="44" height="44">
+        <svg class="anemo-compass" viewBox="0 0 40 40" width="42" height="42">
           <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(150,200,90,0.22)" stroke-width="1"/>
           <circle cx="20" cy="20" r="13" fill="none" stroke="rgba(150,200,90,0.10)" stroke-width="0.5"/>
-          <line x1="20" y1="4"  x2="20" y2="8"  stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
+          <line x1="20" y1="4" x2="20" y2="8" stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
           <line x1="20" y1="32" x2="20" y2="36" stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
-          <line x1="4"  y1="20" x2="8"  y2="20" stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
+          <line x1="4" y1="20" x2="8" y2="20" stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
           <line x1="32" y1="20" x2="36" y2="20" stroke="rgba(150,200,90,0.35)" stroke-width="1"/>
           <g id="anemoArrow" transform="rotate(90 20 20)">
             <line x1="20" y1="32" x2="20" y2="8" stroke="#ffbe4d" stroke-width="2" stroke-linecap="round"/>
@@ -215,30 +281,31 @@
       <div class="title">◤ BALLISTIC COMPUTER ◢</div>
       <div class="crow">
         <label>RANGE</label>
-        <input id="rangeInput" type="number" value="600" min="100" max="1500" step="1">
+        <input id="rangeInput" type="number" value="600" min="100" max="2000" step="1">
         <span class="unit">M</span>
         <button id="lockRange">LOCK</button>
       </div>
       <div class="crow">
         <label>WIND</label>
-        <button id="windL" class="windBtn active">◀ FROM L</button>
-        <button id="windR" class="windBtn">FROM R ▶</button>
+        <button id="windL" class="windBtn active">◀ L</button>
+        <button id="windR" class="windBtn">R ▶</button>
         <input id="windInput" type="number" value="5" min="0" max="15" step="0.5">
         <span class="unit">M/S</span>
         <button id="lockWind">LOCK</button>
       </div>
-      <div class="hint" id="computerHint">READ THE ANEMOMETER, THEN LOCK WIND</div>
+      <div class="hint" id="computerHint">CLICK A TARGET TO SELECT IT</div>
     </div>
 
     <div class="panel br">
       <div class="title">◤ FIRE SOLUTION ◢</div>
-      <div class="row"><span>ELEVATION</span><b id="uiElev">--</b></div>
-      <div class="row"><span>WINDAGE</span><b id="uiWind">--</b></div>
-      <div class="row"><span>STATUS</span><b id="uiStatus">AWAITING RANGE</b></div>
-      <div class="row"><span>HITS / SHOTS</span><b id="uiStats">0 / 0</b></div>
+      <div class="row"><span>ELEV</span><b id="uiElev">--</b></div>
+      <div class="row"><span>DRIFT</span><b id="uiWind">--</b></div>
+      <div class="row"><span>STATUS</span><b id="uiStatus">SELECT TARGET</b></div>
+      <div class="row"><span>HITS/SHOTS</span><b id="uiStats">0 / 0</b></div>
       <div class="row"><span>SCORE</span><b id="uiScore" class="big">0</b></div>
       <button id="fireBtn" class="fire wide" disabled>FIRE</button>
-      <button id="nextBtn" class="wide" disabled>NEXT TARGET ▶</button>
+      <button id="changeBtn" class="change wide" disabled>CHANGE TARGET</button>
+      <button id="nextBtn" class="wide" disabled>NEW SESSION ▶</button>
     </div>
 
     <div id="banner">
@@ -246,302 +313,706 @@
       <div id="bannerSub"></div>
     </div>
   </div>
+
+  <div id="lockHint">
+    <div><span class="k">TAB</span> TO LOCK MOUSE &nbsp;·&nbsp; <span class="k">SPACE</span> TO TOGGLE SCOPE</div>
+    <div style="margin-top:5px;font-size:10px;color:#6b8a52;">LMB = SELECT / FIRE &nbsp;·&nbsp; DRAG = LOOK</div>
+  </div>
+
+  <div id="panPad">
+    <div></div><button data-dir="up">▲</button><div></div>
+    <button data-dir="left">◀</button><div></div><button data-dir="right">▶</button>
+    <div></div><button data-dir="down">▼</button><div></div>
+  </div>
 </div>
 
-<script>
-(() => {
-'use strict';
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 
-const canvas = document.getElementById('scene');
-const ctx    = canvas.getContext('2d');
-let W = 0, H = 0, DPR = 1;
+<script type="module">
+import * as THREE from 'three';
 
-function resize(){
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width  = Math.floor(W * DPR);
-  canvas.height = Math.floor(H * DPR);
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
-}
-window.addEventListener('resize', resize);
-resize();
+/* =========================================================
+   BALLISTICS CONSTANTS — moderate for playability
+   ---------------------------------------------------------
+   The offsets are visible but stay on screen even at 30X.
+   ========================================================= */
+const MUZZLE_V     = 800;
+const G            = 9.81;
+const GRAVITY_MULT = 1.6;    // 1.6× gravity
+const WIND_MULT    = 1.6;    // 1.6× wind
+const ZERO_D       = 500;    // zeroed at 500 m
 
-const FOCAL    = 6667;
-const ZOOMS    = [4, 8, 12];
-const LADDER   = [400, 500, 600, 700, 800, 900];
-const MUZZLE_V = 800;
-const G        = 9.81;
-const ZERO_D   = 600;
-const TIME_MAX = 60;
-const MAX_SHOTS_PER_TARGET = 5;
+/* =========================================================
+   SCOPE / ZOOM
+   ========================================================= */
+const ZOOMS = [4, 12, 30];
+const FOV_AT_ZOOM = { 4: 6.0, 12: 2.0, 30: 0.8 };
+const UNSCOPED_FOV = 72;
 
-const HIT_ZONE = {
-  STANDING: { halfH: 0.65, halfW: 0.32 },
-  PRONE:    { halfH: 0.30, halfW: 0.42 }
+const PHASE = {
+  SELECT:'SELECT', RANGE:'RANGE', WIND:'WIND',
+  SOLUTION:'SOLUTION', FIRING:'FIRING', SPOT:'SPOT', RESULT:'RESULT'
 };
-
-/* Head zones (metres) — measured from target ground base */
-const HEAD_ZONE = {
-  STANDING: { cyFromTop: 0.11, r: 0.13 },  // head center at 11% down from top, radius 13cm
-  PRONE:    { cyFromGround: 0.75, r: 0.12 } // prone head center 75% up, radius 12cm
-};
-
-const PHASE = { RANGE:'RANGE', WIND:'WIND', SOLUTION:'SOLUTION',
-                FIRING:'FIRING', SPOT:'SPOT', RESULT:'RESULT' };
 
 const STANCES = {
-  STANDING: { label:'STANDING', height: 1.80 },
-  PRONE:    { label:'PRONE',    height: 0.50 }
+  STANDING: { label:'STANDING', height:3.0, width:1.4,  spriteType:'standing' },
+  PRONE:    { label:'PRONE',    height:1.2, width:2.2,  spriteType:'prone' }
 };
 
-function holdoverMils(d){
-  const dropD    = 0.5 * G * Math.pow(d / MUZZLE_V, 2);
-  const zeroLine = 0.5 * G * Math.pow(ZERO_D / MUZZLE_V, 2) * (d / ZERO_D);
-  return (dropD - zeroLine) / d * 1000;
-}
-function driftMils(d, w){ return w * d * 0.00038; }
-const milPx = () => FOCAL * S.zoom / 1000;
+const TIME_MAX = 120;
+const MAX_SHOTS = 4;
+const TARGETS_PER_SESSION = 5;
 
+const HIT_ZONE = {
+  STANDING: { halfH: 0.9,  halfW: 0.5 },
+  PRONE:    { halfH: 0.5,  halfW: 0.9 }
+};
+const HEAD_ZONE = {
+  STANDING: { cyFromTop: 0.13, r: 0.18 },
+  PRONE:    { cyFromTop: 0.30, r: 0.18 }
+};
+
+/* =========================================================
+   SCREEN SETUP
+   ========================================================= */
+const threeRoot = document.getElementById('three-root');
+const reticleCanvas = document.getElementById('reticleCanvas');
+const rctx = reticleCanvas.getContext('2d');
+let W = 0, H = 0;
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(FOV_AT_ZOOM[4], 1, 0.5, 8000);
+camera.rotation.order = 'YXZ';
+camera.position.set(0, 25, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setClearColor(0x88a8c8);
+threeRoot.appendChild(renderer.domElement);
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(DPR);
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  reticleCanvas.width = Math.floor(W * DPR);
+  reticleCanvas.height = Math.floor(H * DPR);
+  reticleCanvas.style.width = W + 'px';
+  reticleCanvas.style.height = H + 'px';
+}
+
+/* =========================================================
+   LIGHTS
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xe0eaf5, 0x50463a, 1.0));
+const sun = new THREE.DirectionalLight(0xfff4dc, 1.2);
+sun.position.set(-900, 1400, -700);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x8098b0, 0.35));
+
+/* =========================================================
+   SKY
+   ========================================================= */
+function makeSkyTexture(topColor, midColor, botColor) {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, topColor);
+  grad.addColorStop(0.55, midColor);
+  grad.addColorStop(1, botColor);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 16, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+let skyTex = makeSkyTexture('#3a6ba5', '#94b8d8', '#d8e4ec');
+scene.background = skyTex;
+scene.fog = new THREE.Fog(0xa8c0d8, 800, 4500);
+
+/* =========================================================
+   TERRAIN
+   ========================================================= */
+function hash(x, y) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function noise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi);
+  const c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x, y, oct) {
+  let sum = 0, amp = 1, freq = 1, max = 0;
+  for (let i = 0; i < oct; i++) {
+    sum += noise2(x * freq, y * freq) * amp;
+    max += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return sum / max;
+}
+function terrainHeight(x, z) {
+  const d = Math.sqrt(x * x + z * z);
+  const mf = Math.min(1, Math.max(0, (d - 250) / 1400));
+  const n1 = fbm(x * 0.0007 + 12.3, z * 0.0007 + 7.1, 5);
+  const n2 = Math.abs(fbm(x * 0.0018, z * 0.0018, 4) - 0.5) * 2;
+  const n3 = fbm(x * 0.007, z * 0.007, 3);
+  const h = (n1 * 0.55 + n2 * 0.35 + n3 * 0.10) * 380 * mf;
+  const nearFlat = Math.max(0, 1 - d / 300);
+  return h * (1 - nearFlat * 0.85);
+}
+
+const TSIZE = 6000;
+const TSEG = 180;
+const terrainGeo = new THREE.PlaneGeometry(TSIZE, TSIZE, TSEG, TSEG);
+terrainGeo.rotateX(-Math.PI / 2);
+const posArr = terrainGeo.attributes.position;
+for (let i = 0; i < posArr.count; i++) {
+  const x = posArr.getX(i), z = posArr.getZ(i);
+  posArr.setY(i, terrainHeight(x, z));
+}
+terrainGeo.computeVertexNormals();
+
+const vertColors = new Float32Array(posArr.count * 3);
+for (let i = 0; i < posArr.count; i++) {
+  const y = posArr.getY(i);
+  const t = Math.max(0, Math.min(1, y / 300));
+  vertColors[i * 3]     = 0.32 + 0.55 * t;
+  vertColors[i * 3 + 1] = 0.30 + 0.50 * t;
+  vertColors[i * 3 + 2] = 0.22 + 0.55 * t;
+}
+terrainGeo.setAttribute('color', new THREE.BufferAttribute(vertColors, 3));
+
+const terrainMat = new THREE.MeshStandardMaterial({
+  vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0.0
+});
+scene.add(new THREE.Mesh(terrainGeo, terrainMat));
+
+/* =========================================================
+   TARGET SPRITES
+   ========================================================= */
+function makeSoldierTexture(stanceType, mode) {
+  const c = document.createElement('canvas');
+  let cw, ch;
+  if (stanceType === 'standing') { cw = 200; ch = 420; }
+  else { cw = 420; ch = 200; }
+  c.width = cw; c.height = ch;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, cw, ch);
+
+  let bodyColor = '#26261e';
+  let outline = '#0a0a08';
+  if (mode === 'thermal') { bodyColor = '#ff7a30'; outline = '#3a0e00'; }
+  if (mode === 'night')   { bodyColor = '#5cff88'; outline = '#001a08'; }
+
+  g.fillStyle = bodyColor;
+  g.strokeStyle = outline;
+  g.lineWidth = 5;
+
+  if (stanceType === 'standing') {
+    g.beginPath(); g.ellipse(100, 42, 34, 24, 0, Math.PI, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(100, 52, 44, 8, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(100, 78, 18, 22, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath();
+    g.moveTo(58, 108); g.lineTo(142, 108);
+    g.lineTo(132, 260); g.lineTo(68, 260);
+    g.closePath(); g.fill(); g.stroke();
+    g.save();
+    g.translate(100, 228); g.rotate(-0.55);
+    g.fillRect(-95, -8, 190, 16);
+    g.fillRect(-10, 8, 28, 28);
+    g.restore();
+    g.fillRect(44, 118, 20, 130);
+    g.fillRect(136, 118, 20, 130);
+    g.fillRect(68, 260, 28, 128);
+    g.fillRect(104, 260, 28, 128);
+    g.fillRect(62, 384, 40, 16);
+    g.fillRect(98, 384, 40, 16);
+  } else {
+    const cx = cw / 2;
+    g.beginPath();
+    g.ellipse(cx, 148, 130, 42, 0, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    g.fillRect(cx - 22, 90, 44, 40);
+    g.beginPath(); g.arc(cx, 78, 32, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    g.beginPath();
+    g.ellipse(cx, 56, 44, 30, 0, Math.PI, Math.PI * 2);
+    g.fill();
+    g.fillRect(cx - 52, 62, 104, 10);
+    g.fillRect(cx + 60, 130, 80, 9);
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.beginPath();
+    g.ellipse(cx, 182, 130, 12, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createTargetSprite(stance, mode) {
+  const tex = makeSoldierTexture(stance.spriteType, mode);
+  const mat = new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: true, depthWrite: false,
+    fog: true, alphaTest: 0.05
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(stance.width, stance.height, 1);
+  return sprite;
+}
+
+/* =========================================================
+   STATE
+   ========================================================= */
 const S = {
   zoomIdx: 0,
   zoom: ZOOMS[0],
-  phase: PHASE.RANGE,
-
-  dist: 700,
-  lateral: 0,
-  windDir: 1,
-  windSpeed: 6,
-  stance: STANCES.STANDING,
-
-  estRange: 600,
-  estWindDir: 1,
-  estWindSpeed: 5,
-
-  panX: 0, panY: 0,
-
+  scopeMode: 'day',
+  scopeOn: true,
+  phase: PHASE.SELECT,
+  windDir: 1, windSpeed: 6,
+  estRange: 600, estWindDir: 1, estWindSpeed: 5,
+  yaw: 0, pitch: 0,
   time: TIME_MAX,
   shots: 0, hits: 0, headshots: 0, score: 0,
-  shotsOnTarget: 0,
-
-  bullet: null,
-  impactFx: null,
-  flash: 0,
-  headshotFlash: 0,
-  muzzleFlash: 0,
-
-  tx: 0, ty: 0, th: 0,
-
-  anemoTime: 0,
-  anemoCurrent: 0,
-  anemoPeak: 0,
-  anemoHistory: []
+  activeIdx: -1,
+  targets: [],
+  bullet: null, impactFx: null,
+  flash: 0, headshotFlash: 0, muzzleFlash: 0,
+  pendingTargetIdx: -1,
+  anemoTime: 0, anemoCurrent: 0, anemoPeak: 0, anemoHistory: []
 };
 
+/* =========================================================
+   DOM
+   ========================================================= */
 const els = {
-  zoom:      document.getElementById('uiZoom'),
-  phase:     document.getElementById('uiPhase'),
-  stance:    document.getElementById('uiStance'),
-  shotNo:    document.getElementById('uiShotNo'),
-  time:      document.getElementById('uiTime'),
-  timeBar:   document.getElementById('timeBar'),
-  elev:      document.getElementById('uiElev'),
-  wind:      document.getElementById('uiWind'),
-  status:    document.getElementById('uiStatus'),
-  stats:     document.getElementById('uiStats'),
-  score:     document.getElementById('uiScore'),
-  range:     document.getElementById('rangeInput'),
-  windIn:    document.getElementById('windInput'),
+  zoom: document.getElementById('uiZoom'),
+  phase: document.getElementById('uiPhase'),
+  stance: document.getElementById('uiStance'),
+  targetsNo: document.getElementById('uiTargets'),
+  time: document.getElementById('uiTime'),
+  timeBar: document.getElementById('timeBar'),
+  elev: document.getElementById('uiElev'),
+  wind: document.getElementById('uiWind'),
+  status: document.getElementById('uiStatus'),
+  stats: document.getElementById('uiStats'),
+  score: document.getElementById('uiScore'),
+  rangeInput: document.getElementById('rangeInput'),
+  windInput: document.getElementById('windInput'),
   lockRange: document.getElementById('lockRange'),
-  lockWind:  document.getElementById('lockWind'),
-  windL:     document.getElementById('windL'),
-  windR:     document.getElementById('windR'),
-  fire:      document.getElementById('fireBtn'),
-  next:      document.getElementById('nextBtn'),
-  zoomRow:   document.getElementById('zoomRow'),
-  banner:    document.getElementById('banner'),
-  bMain:     document.getElementById('bannerMain'),
-  bSub:      document.getElementById('bannerSub'),
-  compHint:  document.getElementById('computerHint'),
+  lockWind: document.getElementById('lockWind'),
+  windL: document.getElementById('windL'),
+  windR: document.getElementById('windR'),
+  fire: document.getElementById('fireBtn'),
+  change: document.getElementById('changeBtn'),
+  next: document.getElementById('nextBtn'),
+  lockStatus: document.getElementById('lockStatus'),
+  zoomRow: document.getElementById('zoomRow'),
+  modeRow: document.getElementById('modeRow'),
+  modeTint: document.getElementById('modeTint'),
+  banner: document.getElementById('banner'),
+  bMain: document.getElementById('bannerMain'),
+  bSub: document.getElementById('bannerSub'),
+  compHint: document.getElementById('computerHint'),
   compPanel: document.getElementById('computerPanel'),
   anemoSpeed: document.getElementById('anemoSpeed'),
-  anemoDir:   document.getElementById('anemoDir'),
-  anemoBar:   document.getElementById('anemoBar'),
-  anemoHint:  document.getElementById('anemoHint'),
-  anemoArrow: document.getElementById('anemoArrow')
+  anemoDir: document.getElementById('anemoDir'),
+  anemoBar: document.getElementById('anemoBar'),
+  anemoHint: document.getElementById('anemoHint'),
+  anemoArrow: document.getElementById('anemoArrow'),
+  lockHint: document.getElementById('lockHint'),
+  tintLayer: document.getElementById('tintLayer'),
+  scanLayer: document.getElementById('scanLayer'),
+  vigLayer: document.getElementById('vigLayer'),
+  glowLayer: document.getElementById('glowLayer')
 };
 
-const keys = {};
-let dragging = false, lastX = 0, lastY = 0;
+/* =========================================================
+   BALLISTICS
+   ---------------------------------------------------------
+   Tuned so drop and drift are visible but not off-screen.
 
-canvas.addEventListener('mousedown', e => {
-  dragging = true; lastX = e.clientX; lastY = e.clientY;
-});
-window.addEventListener('mouseup', () => { dragging = false; });
-window.addEventListener('mousemove', e => {
-  if (!dragging) return;
-  const dx = e.clientX - lastX;
-  const dy = e.clientY - lastY;
-  lastX = e.clientX; lastY = e.clientY;
-  S.panX -= dx; S.panY -= dy;
-});
+     Range    Drop     Drift @ 8 m/s
+     500 m    0.0 mil  1.7 mil
+     600 m    1.3 mil  2.4 mil
+     700 m    2.6 mil  3.0 mil
+     800 m    4.0 mil  3.6 mil
+     900 m    5.3 mil  4.2 mil
+     1000 m   6.7 mil  4.7 mil
+   ========================================================= */
+function holdoverMils(d) {
+  const gEff = G * GRAVITY_MULT;
+  const dropD    = 0.5 * gEff * Math.pow(d / MUZZLE_V, 2);
+  const zeroLine = 0.5 * gEff * Math.pow(ZERO_D / MUZZLE_V, 2) * (d / ZERO_D);
+  return (dropD - zeroLine) / d * 1000;
+}
+function driftMils(d, w) {
+  return w * d * 0.00038 * WIND_MULT;
+}
+function milPx() {
+  const vFovRad = camera.fov * Math.PI / 180;
+  const k = H / (2 * Math.tan(vFovRad / 2));
+  return k / 1000;
+}
+function getPixelsPerRadian() {
+  const vFovRad = camera.fov * Math.PI / 180;
+  return H / vFovRad;
+}
 
-canvas.addEventListener('touchstart', e => {
-  if (e.touches.length === 1){
-    dragging = true;
-    lastX = e.touches[0].clientX;
-    lastY = e.touches[0].clientY;
+/* =========================================================
+   SCOPE TOGGLE
+   ========================================================= */
+function setScopeOn(on) {
+  S.scopeOn = on;
+  camera.fov = on ? FOV_AT_ZOOM[S.zoom] : UNSCOPED_FOV;
+  camera.updateProjectionMatrix();
+  els.tintLayer.style.opacity = on ? '1' : '0.25';
+  els.scanLayer.style.opacity = on ? '0.42' : '0.1';
+  els.vigLayer.style.opacity = on ? '1' : '0.35';
+  els.glowLayer.style.opacity = on ? '1' : '0.2';
+  updatePhaseUI();
+}
+
+function setZoom(idx) {
+  if (idx === S.zoomIdx) return;
+  S.zoomIdx = idx;
+  S.zoom = ZOOMS[idx];
+  if (S.scopeOn) {
+    camera.fov = FOV_AT_ZOOM[S.zoom];
+    camera.updateProjectionMatrix();
   }
-}, {passive:true});
-canvas.addEventListener('touchmove', e => {
+  [...els.zoomRow.children].forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+/* =========================================================
+   POINTER LOCK
+   ========================================================= */
+let pointerLocked = false;
+let isTouchDevice = false;
+window.addEventListener('touchstart', () => { isTouchDevice = true; }, { once: true, passive: true });
+
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === threeRoot;
+  if (pointerLocked) {
+    els.lockHint.classList.remove('show');
+    els.lockStatus.textContent = 'MOUSE LOCKED · TAB TO RELEASE';
+    els.lockStatus.classList.add('hot');
+  } else {
+    els.lockStatus.textContent = 'TAB = LOCK · SPACE = SCOPE';
+    els.lockStatus.classList.remove('hot');
+    if (!isTouchDevice) els.lockHint.classList.add('show');
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (pointerLocked) {
+    const ppr = getPixelsPerRadian();
+    S.yaw   -= e.movementX / ppr;
+    S.pitch -= e.movementY / ppr;
+  }
+});
+
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+let dragging = false, lastX = 0, lastY = 0;
+let downX = 0, downY = 0, downTime = 0, moved = false;
+
+threeRoot.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (pointerLocked) {
+    handleCenterAction();
+    return;
+  }
+  dragging = true;
+  lastX = e.clientX; lastY = e.clientY;
+  downX = e.clientX; downY = e.clientY;
+  downTime = performance.now(); moved = false;
+});
+
+window.addEventListener('mouseup', e => {
+  if (e.button !== 0) return;
+  if (pointerLocked) return;
+  if (dragging && !moved && (performance.now() - downTime) < 400) {
+    handleTap(e.clientX, e.clientY);
+  }
+  dragging = false;
+});
+
+window.addEventListener('mousemove', e => {
+  if (pointerLocked) return;
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+  lastX = e.clientX; lastY = e.clientY;
+  const ppr = getPixelsPerRadian();
+  S.yaw   -= dx / ppr;
+  S.pitch -= dy / ppr;
+});
+
+threeRoot.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    downX = lastX; downY = lastY;
+    downTime = performance.now(); moved = false;
+  }
+}, { passive: true });
+threeRoot.addEventListener('touchmove', e => {
   if (!dragging || e.touches.length !== 1) return;
   const x = e.touches[0].clientX, y = e.touches[0].clientY;
-  S.panX -= (x - lastX);
-  S.panY -= (y - lastY);
+  const dx = x - lastX, dy = y - lastY;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
   lastX = x; lastY = y;
-}, {passive:true});
-canvas.addEventListener('touchend', () => { dragging = false; });
+  const ppr = getPixelsPerRadian();
+  S.yaw   -= dx / ppr;
+  S.pitch -= dy / ppr;
+  e.preventDefault();
+}, { passive: false });
+threeRoot.addEventListener('touchend', e => {
+  if (dragging && !moved && (performance.now() - downTime) < 500) {
+    const t = e.changedTouches[0];
+    if (t) handleTap(t.clientX, t.clientY);
+  }
+  dragging = false;
+}, { passive: true });
+
+document.querySelectorAll('#panPad button').forEach(btn => {
+  const dir = btn.dataset.dir;
+  const start = () => keys['PAD_' + dir] = true;
+  const stop  = () => keys['PAD_' + dir] = false;
+  btn.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
+  btn.addEventListener('touchend',   e => { e.preventDefault(); stop(); },  { passive: false });
+  btn.addEventListener('touchcancel', () => stop());
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', stop);
+  btn.addEventListener('mouseleave', stop);
+});
+
+const keys = {};
 
 window.addEventListener('keydown', e => {
-  keys[e.key] = true;
-  if (e.key === 'Enter'){
+  if (e.key === 'Tab') {
     e.preventDefault();
-    if (S.phase === PHASE.RANGE)         lockRange();
-    else if (S.phase === PHASE.WIND)     lockWind();
-    else if (S.phase === PHASE.SOLUTION) fire();
-    else if (S.phase === PHASE.SPOT)     fire();
+    if (pointerLocked) document.exitPointerLock();
+    else threeRoot.requestPointerLock && threeRoot.requestPointerLock();
+    return;
+  }
+  if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') {
+    e.preventDefault();
+    setScopeOn(!S.scopeOn);
+    return;
+  }
+  keys[e.key] = true;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (S.phase === PHASE.RANGE) lockRange();
+    else if (S.phase === PHASE.WIND) lockWind();
+    else if (S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT) fire();
     else if (S.phase === PHASE.RESULT && !els.next.disabled) newRound();
   }
+  if ((e.key === 'c' || e.key === 'C') && !els.change.disabled) changeTarget();
   if ((e.key === 'n' || e.key === 'N') && !els.next.disabled) newRound();
+  if (e.key === 'z' || e.key === 'Z') setScopeOn(!S.scopeOn);
 });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-function clampPan(){
-  S.panX = Math.max(-W * 0.75, Math.min(W * 0.75, S.panX));
-  S.panY = Math.max(-H * 0.65, Math.min(H * 0.65, S.panY));
+/* =========================================================
+   PROJECTION
+   ========================================================= */
+function projectTarget(t) {
+  const v = new THREE.Vector3(t.pos.x, t.pos.y, t.pos.z);
+  v.project(camera);
+  if (v.z > 1 || v.z < -1) return null;
+  const sx = (v.x * 0.5 + 0.5) * W;
+  const sy = (-v.y * 0.5 + 0.5) * H;
+  return { sx, sy };
 }
-function readRange(){
-  let v = parseFloat(els.range.value);
-  if (!isFinite(v)) v = 600;
-  v = Math.round(Math.max(100, Math.min(1500, v)));
-  els.range.value = v;
-  S.estRange = v;
-}
-function readWind(){
-  let v = parseFloat(els.windIn.value);
-  if (!isFinite(v)) v = 0;
-  v = Math.round(Math.max(0, Math.min(15, v)) * 2) / 2;
-  els.windIn.value = v;
-  S.estWindSpeed = v;
+function targetScreenBounds(t) {
+  const p = projectTarget(t);
+  if (!p) return null;
+  const dist = Math.hypot(t.pos.x - camera.position.x,
+                          t.pos.y - camera.position.y,
+                          t.pos.z - camera.position.z);
+  if (dist <= 0.1) return null;
+  const vFovRad = camera.fov * Math.PI / 180;
+  const k = H / (2 * Math.tan(vFovRad / 2));
+  const h = t.stance.height * k / dist;
+  const w = t.stance.width * k / dist;
+  return { cx: p.sx, cy: p.sy, h, w, dist };
 }
 
-function newRound(){
-  S.dist      = 400 + Math.floor(Math.random() * 501);
-  S.lateral   = (Math.random() * 2 - 1) * 2.5;
-  S.windDir   = Math.random() < 0.5 ? 1 : -1;
+/* =========================================================
+   ROUND FLOW
+   ========================================================= */
+function newRound() {
+  for (const t of S.targets) {
+    scene.remove(t.sprite);
+    if (t.sprite.material.map) t.sprite.material.map.dispose();
+    t.sprite.material.dispose();
+  }
+  S.targets = [];
+
+  S.windDir = Math.random() < 0.5 ? 1 : -1;
   S.windSpeed = Math.round((3 + Math.random() * 7) * 2) / 2;
 
-  S.stance = Math.random() < 0.55 ? STANCES.STANDING : STANCES.PRONE;
+  for (let i = 0; i < TARGETS_PER_SESSION; i++) {
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const dist = 250 + Math.random() * 550;
+      const lateral = (Math.random() - 0.5) * 450;
+      const x = lateral;
+      const z = -dist;
+      const groundY = terrainHeight(x, z);
+      const stance = Math.random() < 0.5 ? STANCES.STANDING : STANCES.PRONE;
 
-  S.panX = -S.lateral * (FOCAL * S.zoom / S.dist);
-  S.panY = 0;
-  S.phase = PHASE.RANGE;
-  S.time  = TIME_MAX;
-  S.bullet = null;
-  S.impactFx = null;
-  S.flash = 0;
-  S.headshotFlash = 0;
-  S.muzzleFlash = 0;
-  S.anemoTime     = 0;
-  S.anemoCurrent  = 0;
-  S.anemoPeak     = 0;
-  S.anemoHistory  = [];
-  S.shotsOnTarget = 0;
+      let tooClose = false;
+      for (const e of S.targets) {
+        if (Math.hypot(e.pos.x - x, e.pos.z - z) < 90) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
 
-  els.range.value = 600;
-  els.windIn.value = 5;
+      const sprite = createTargetSprite(stance, S.scopeMode);
+      const centerY = groundY + stance.height / 2;
+      sprite.position.set(x, centerY, z);
+      scene.add(sprite);
+
+      S.targets.push({
+        pos: { x, y: centerY, z },
+        groundY,
+        stance,
+        sprite,
+        killed: false, headshot: false,
+        shotsOnTarget: 0,
+        pendingResult: null,
+        failed: false
+      });
+      break;
+    }
+  }
+
+  S.yaw = 0; S.pitch = 0;
+  S.phase = PHASE.SELECT;
+  S.time = TIME_MAX;
+  S.bullet = null; S.impactFx = null;
+  S.flash = 0; S.headshotFlash = 0; S.muzzleFlash = 0;
+  S.anemoTime = 0; S.anemoCurrent = 0; S.anemoPeak = 0; S.anemoHistory = [];
+  S.shots = 0; S.hits = 0; S.headshots = 0; S.score = 0;
+  S.pendingTargetIdx = -1;
+  S.activeIdx = -1;
+
+  els.rangeInput.value = 600;
+  els.windInput.value = 5;
   S.estWindDir = 1;
   els.windL.classList.add('active');
   els.windR.classList.remove('active');
   els.banner.classList.remove('show');
   els.bMain.className = '';
-  els.compHint.textContent = 'READ THE ANEMOMETER, THEN LOCK WIND';
+  els.compHint.textContent = isTouchDevice ? 'TAP A TARGET TO SELECT IT' : 'CLICK A TARGET TO SELECT IT';
   els.compHint.classList.remove('hot');
   updatePhaseUI();
 }
 
-function lockRange(){
+function lockRange() {
   if (S.phase !== PHASE.RANGE && S.phase !== PHASE.SPOT) return;
-  readRange();
-  if (S.phase === PHASE.RANGE){
+  let v = parseFloat(els.rangeInput.value);
+  if (!isFinite(v)) v = 600;
+  v = Math.round(Math.max(100, Math.min(2000, v)));
+  els.rangeInput.value = v;
+  S.estRange = v;
+  if (S.phase === PHASE.RANGE) {
     S.phase = PHASE.WIND;
     updatePhaseUI();
   } else {
-    els.compHint.textContent = 'RANGE UPDATED → ' + S.estRange + ' M — RE-FIRE WHEN READY';
+    els.compHint.textContent = 'RANGE → ' + v + ' M — RE-FIRE WHEN READY';
     els.compHint.classList.add('hot');
   }
 }
-function lockWind(){
+function lockWind() {
   if (S.phase !== PHASE.WIND && S.phase !== PHASE.SPOT) return;
-  readWind();
-  if (S.phase === PHASE.WIND){
+  let v = parseFloat(els.windInput.value);
+  if (!isFinite(v)) v = 0;
+  v = Math.round(Math.max(0, Math.min(15, v)) * 2) / 2;
+  els.windInput.value = v;
+  S.estWindSpeed = v;
+  if (S.phase === PHASE.WIND) {
     S.phase = PHASE.SOLUTION;
     updatePhaseUI();
   } else {
-    els.compHint.textContent = 'WIND UPDATED → ' + S.estWindSpeed.toFixed(1) +
-                               ' M/S (' + (S.estWindDir === 1 ? 'FROM L' : 'FROM R') +
-                               ') — RE-FIRE WHEN READY';
+    els.compHint.textContent = 'WIND → ' + v.toFixed(1) + ' M/S — RE-FIRE WHEN READY';
     els.compHint.classList.add('hot');
   }
 }
 
-function updatePhaseUI(){
+function remainingTargets() { return S.targets.filter(t => !t.killed).length; }
+
+function updatePhaseUI() {
   const p = S.phase;
+  const hasTarget = S.activeIdx >= 0 && S.targets[S.activeIdx] && !S.targets[S.activeIdx].killed;
   const canEditRange = (p === PHASE.RANGE || p === PHASE.SPOT);
   const canEditWind  = (p === PHASE.WIND  || p === PHASE.SPOT);
-  const canFire      = (p === PHASE.SOLUTION || p === PHASE.SPOT);
+  const canFire      = ((p === PHASE.SOLUTION || p === PHASE.SPOT) && hasTarget && S.scopeOn);
+  const canChange    = (p === PHASE.RANGE || p === PHASE.WIND || p === PHASE.SOLUTION);
   const canNext      = (p === PHASE.RESULT);
 
-  els.range.disabled     = !canEditRange;
-  els.lockRange.disabled = !canEditRange;
-  els.windIn.disabled    = !canEditWind;
-  els.lockWind.disabled  = !canEditWind;
-  els.windL.disabled     = !canEditWind;
-  els.windR.disabled     = !canEditWind;
-  els.fire.disabled      = !canFire;
-  els.next.disabled      = !canNext;
+  els.rangeInput.disabled = !canEditRange;
+  els.lockRange.disabled  = !canEditRange;
+  els.windInput.disabled  = !canEditWind;
+  els.lockWind.disabled   = !canEditWind;
+  els.windL.disabled      = !canEditWind;
+  els.windR.disabled      = !canEditWind;
+  els.fire.disabled       = !canFire;
+  els.change.disabled     = !canChange;
+  els.next.disabled       = !canNext;
 
-  els.range.classList.toggle('editable', canEditRange && p === PHASE.SPOT);
-  els.windIn.classList.toggle('editable', canEditWind && p === PHASE.SPOT);
+  els.rangeInput.classList.toggle('editable', canEditRange && p === PHASE.SPOT);
+  els.windInput.classList.toggle('editable', canEditWind && p === PHASE.SPOT);
   els.compPanel.classList.toggle('editing', p === PHASE.SPOT);
 
   els.fire.textContent = (p === PHASE.SPOT) ? 'RE-FIRE' : 'FIRE';
   els.fire.classList.toggle('refire', p === PHASE.SPOT);
 
   els.phase.textContent = p;
-  els.stance.textContent = S.stance.label;
-  els.shotNo.textContent = (S.shotsOnTarget + 1);
+  const t = hasTarget ? S.targets[S.activeIdx] : null;
+  if (t) {
+    els.stance.textContent = t.stance.label;
+    els.stance.className = 'sel';
+  } else {
+    els.stance.textContent = '--';
+    els.stance.className = '';
+  }
+  els.targetsNo.textContent = remainingTargets() + '/' + S.targets.length;
 
-  if (p === PHASE.RANGE)         els.status.textContent = 'AWAITING RANGE';
+  if (p === PHASE.SELECT)        els.status.textContent = 'SELECT TARGET';
+  else if (p === PHASE.RANGE)    els.status.textContent = 'AWAITING RANGE';
   else if (p === PHASE.WIND)     els.status.textContent = 'AWAITING WIND';
   else if (p === PHASE.SOLUTION) els.status.textContent = 'ALIGN & FIRE';
   else if (p === PHASE.FIRING)   els.status.textContent = 'ROUND AWAY';
   else if (p === PHASE.SPOT)     els.status.textContent = 'EDIT & RE-FIRE';
-  else                            els.status.textContent = 'COMPLETE';
+  else                            els.status.textContent = remainingTargets() === 0 ? 'SESSION CLEAR' : 'COMPLETE';
 
-  if (p === PHASE.SOLUTION || p === PHASE.SPOT){
-    const hold  = holdoverMils(S.estRange);
+  if (p === PHASE.SOLUTION || p === PHASE.SPOT) {
+    const hold = holdoverMils(S.estRange);
     const drift = S.estWindDir * driftMils(S.estRange, S.estWindSpeed);
     els.elev.textContent = (hold >= 0 ? '+' : '') + hold.toFixed(1) + ' MIL';
-    els.elev.className   = 'ok';
-    if (Math.abs(drift) < 0.05){
-      els.wind.textContent = '0.0 MIL';
-    } else {
-      els.wind.textContent = Math.abs(drift).toFixed(1) + ' MIL ' + (drift > 0 ? 'R' : 'L');
-    }
+    els.elev.className = 'ok';
+    if (Math.abs(drift) < 0.05) els.wind.textContent = '0.0 MIL';
+    else els.wind.textContent = Math.abs(drift).toFixed(1) + ' MIL ' + (drift > 0 ? 'R' : 'L');
     els.wind.className = 'ok';
-  } else if (p === PHASE.RANGE || p === PHASE.WIND){
+  } else {
     els.elev.textContent = '--';
     els.wind.textContent = '--';
     els.elev.className = '';
@@ -549,147 +1020,184 @@ function updatePhaseUI(){
   }
 }
 
-function timeout(){
-  if (S.phase === PHASE.RANGE){ readRange(); S.phase = PHASE.WIND; updatePhaseUI(); }
-  if (S.phase === PHASE.WIND){ readWind(); S.phase = PHASE.SOLUTION; updatePhaseUI(); }
-  if (S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT) fire();
+function handleCenterAction() {
+  const cx = W / 2, cy = H / 2;
+  if (S.phase === PHASE.SELECT) {
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < S.targets.length; i++) {
+      const t = S.targets[i];
+      if (t.killed) continue;
+      const b = targetScreenBounds(t);
+      if (!b) continue;
+      const d = Math.hypot(b.cx - cx, b.cy - cy);
+      const maxD = Math.max(60, b.h * 1.8);
+      if (d < maxD && d < bestD) { bestD = d; best = i; }
+    }
+    if (best >= 0) {
+      S.activeIdx = best;
+      S.phase = PHASE.RANGE;
+      updatePhaseUI();
+      els.compHint.textContent = 'TARGET LOCKED — ENTER RANGE';
+      els.compHint.classList.remove('hot');
+    } else {
+      els.compHint.textContent = 'NO TARGET UNDER CROSSHAIR';
+    }
+  } else if ((S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT) && S.scopeOn) {
+    fire();
+  }
+}
+
+function handleTap(x, y) {
+  if (S.phase !== PHASE.SELECT) return;
+  let best = -1, bestD = Infinity;
+  for (let i = 0; i < S.targets.length; i++) {
+    const t = S.targets[i];
+    if (t.killed) continue;
+    const b = targetScreenBounds(t);
+    if (!b) continue;
+    const halfW = Math.max(35, b.w * 0.8);
+    const halfH = Math.max(35, b.h * 0.8);
+    if (x > b.cx - halfW && x < b.cx + halfW && y > b.cy - halfH && y < b.cy + halfH) {
+      const d = Math.hypot(x - b.cx, y - b.cy);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+  }
+  if (best >= 0) {
+    S.activeIdx = best;
+    S.phase = PHASE.RANGE;
+    updatePhaseUI();
+    els.compHint.textContent = 'TARGET SELECTED — ENTER RANGE';
+    els.compHint.classList.remove('hot');
+  }
+}
+
+function changeTarget() {
+  if (S.phase === PHASE.SELECT || S.phase === PHASE.FIRING) return;
+  S.activeIdx = -1;
+  S.phase = PHASE.SELECT;
+  els.banner.classList.remove('show');
+  els.compHint.textContent = isTouchDevice ? 'TAP A TARGET TO SELECT IT' : 'CLICK A TARGET TO SELECT IT';
+  els.compHint.classList.remove('hot');
+  updatePhaseUI();
 }
 
 /* =========================================================
-   FIRE  —  hit + headshot detection
+   FIRE
    ========================================================= */
-function fire(){
+function fire() {
   if (S.phase !== PHASE.SOLUTION && S.phase !== PHASE.SPOT) return;
-  S.phase = PHASE.FIRING;
+  if (!S.scopeOn) return;
+  const t = S.targets[S.activeIdx];
+  if (!t || t.killed) return;
 
-  readRange();
-  readWind();
+  S.phase = PHASE.FIRING;
+  S.pendingTargetIdx = S.activeIdx;
+
+  let rv = parseFloat(els.rangeInput.value);
+  if (isFinite(rv)) S.estRange = Math.round(Math.max(100, Math.min(2000, rv)));
+  let wv = parseFloat(els.windInput.value);
+  if (isFinite(wv)) S.estWindSpeed = Math.round(Math.max(0, Math.min(15, wv)) * 2) / 2;
 
   els.compHint.textContent = 'ROUND IN FLIGHT...';
   els.compHint.classList.remove('hot');
   updatePhaseUI();
 
-  const MPX = milPx();
-  const trueHold  = holdoverMils(S.dist);
-  const trueDrift = S.windDir * driftMils(S.dist, S.windSpeed);
+  const trueDist = Math.hypot(t.pos.x - camera.position.x, t.pos.z - camera.position.z);
+  const trueHold = holdoverMils(trueDist);
+  const trueDrift = S.windDir * driftMils(trueDist, S.windSpeed);
 
-  const impactX = W / 2 + trueDrift * MPX;
-  const impactY = H / 2 + trueHold  * MPX;
+  const mpx = milPx();
+  const impactX = W / 2 + trueDrift * mpx;
+  const impactY = H / 2 + trueHold * mpx;
 
-  const ppm     = FOCAL * S.zoom / S.dist;
-  const groundY = H / 2 + S.panY;
-  const targetCX = W / 2 + S.lateral * ppm + S.panX;
-  const h        = S.stance.height * ppm;
-  const targetCY = groundY - h / 2;
+  const b = targetScreenBounds(t);
+  if (!b) { S.phase = PHASE.SELECT; updatePhaseUI(); return; }
 
-  /* ---------- Body hit zone ---------- */
-  const z = (S.stance === STANCES.PRONE) ? HIT_ZONE.PRONE : HIT_ZONE.STANDING;
-  const halfH = Math.max(4, z.halfH * ppm);
-  const halfW = Math.max(4, z.halfW * ppm);
+  const bodyHalfH = b.h * 0.52;
+  const bodyHalfW = b.w * 0.55;
+  const dxBody = impactX - b.cx;
+  const dyBody = impactY - b.cy;
+  const bodyHit = (Math.abs(dxBody) < bodyHalfW && Math.abs(dyBody) < bodyHalfH);
 
-  const dx = impactX - targetCX;
-  const dy = impactY - targetCY;
-  const bodyHit = (Math.abs(dx) < halfW && Math.abs(dy) < halfH);
-
-  /* ---------- Headshot zone ---------- */
-  let headshot = false;
-  let headCX = 0, headCY = 0, headR = 0;
-
-  if (S.stance === STANCES.STANDING) {
-    /* Head at top of the standing figure */
-    const hz = HEAD_ZONE.STANDING;
-    headCY = groundY - h + hz.cyFromTop * h;
-    headR  = hz.r * ppm;
-    headCX = targetCX;
-  } else {
-    /* Prone — head sits 75% of total height up from ground */
-    const hz = HEAD_ZONE.PRONE;
-    headCY = groundY - hz.cyFromGround * h;
-    headR  = hz.r * ppm * 2.2;   // visual head is larger on prone
-    headCX = targetCX;
-  }
-
-  const hdx = impactX - headCX;
-  const hdy = impactY - headCY;
-  const headHit = Math.hypot(hdx, hdy) < headR;
+  const headCY = b.cy - b.h / 2 + b.h * (t.stance === STANCES.PRONE ? 0.30 : 0.13);
+  const headR = b.h * (t.stance === STANCES.PRONE ? 0.18 : 0.10);
+  const dHead = Math.hypot(impactX - b.cx, impactY - headCY);
+  const headHit = dHead < headR;
 
   const hit = bodyHit || headHit;
-  if (hit && headHit) headshot = true;
+  const headshot = hit && headHit;
 
-  S.tx = targetCX; S.ty = targetCY; S.th = h;
-  S.pendingResult = {
-    hit, headshot, dx, dy, impactX, impactY,
-    targetCX, targetCY, halfH, halfW,
-    headCX, headCY, headR
+  t.pendingResult = {
+    hit, headshot, coverBlocked: false,
+    dx: dxBody, dy: dyBody,
+    impactX, impactY, targetCX: b.cx, targetCY: b.cy,
+    halfH: bodyHalfH, halfW: bodyHalfW,
+    targetDist: trueDist
   };
 
-  const p0 = { x: W / 2, y: H + 80 };
+  const p0 = { x: W / 2, y: H + 100 };
   const p2 = { x: impactX, y: impactY };
-  const p1 = { x: (p0.x + p2.x) / 2 + 8, y: (p0.y + p2.y) / 2 - 90 };
+  const p1 = { x: (p0.x + p2.x) / 2 + 8, y: (p0.y + p2.y) / 2 - 100 };
 
-  S.bullet = {
-    t: 0,
-    dur: 0.28 + (S.dist / 1000) * 0.55,
-    p0, p1, p2,
-    trail: [],
-    landed: false
-  };
-
+  S.bullet = { t: 0, dur: 0.28 + (trueDist / 1000) * 0.55, p0, p1, p2, trail: [], landed: false };
   S.muzzleFlash = 1;
   S.flash = 0.7;
 }
 
-function onBulletLanded(){
-  const R = S.pendingResult;
-  S.shotsOnTarget++;
+function onBulletLanded() {
+  const t = S.targets[S.pendingTargetIdx];
+  if (!t) return;
+  const R = t.pendingResult;
+  t.shotsOnTarget++;
   S.shots++;
 
-  if (R.hit){
+  if (R.hit) {
     S.hits++;
     if (R.headshot) S.headshots++;
-    resolveTarget(true);
-  } else if (S.shotsOnTarget >= MAX_SHOTS_PER_TARGET){
-    resolveTarget(false);
+    t.killed = true;
+    t.headshot = R.headshot;
+    scene.remove(t.sprite);
+    resolveHit(t, true);
+  } else if (t.shotsOnTarget >= MAX_SHOTS) {
+    t.killed = true;
+    t.failed = true;
+    scene.remove(t.sprite);
+    resolveHit(t, false);
   } else {
-    enterSpotPhase();
+    enterSpotPhase(t);
   }
 }
 
-function enterSpotPhase(){
-  const R = S.pendingResult;
+function enterSpotPhase(t) {
+  const R = t.pendingResult;
   S.phase = PHASE.SPOT;
   updatePhaseUI();
 
-  const MPX = milPx();
-  const dxMil = R.dx / MPX;
-  const dyMil = R.dy / MPX;
-
+  const mpx = milPx();
+  const dxMil = R.dx / mpx;
+  const dyMil = R.dy / mpx;
   const dirs = [];
   if (Math.abs(dyMil) > 0.05) dirs.push(Math.abs(dyMil).toFixed(1) + ' MIL ' + (dyMil > 0 ? 'LOW' : 'HIGH'));
   if (Math.abs(dxMil) > 0.05) dirs.push(Math.abs(dxMil).toFixed(1) + ' MIL ' + (dxMil > 0 ? 'RIGHT' : 'LEFT'));
   const impactLine = dirs.length ? 'IMPACT ' + dirs.join(' · ') : 'IMPACT UNOBSERVED';
 
   const hints = [];
-  if (dyMil >  0.05) hints.push('INCREASE RANGE ESTIMATE');
-  if (dyMil < -0.05) hints.push('DECREASE RANGE ESTIMATE');
-  if (dxMil >  0.05) hints.push('MORE WINDAGE');
+  if (dyMil > 0.05)  hints.push('INCREASE RANGE EST.');
+  if (dyMil < -0.05) hints.push('DECREASE RANGE EST.');
+  if (dxMil > 0.05)  hints.push('MORE WINDAGE');
   if (dxMil < -0.05) hints.push('LESS WINDAGE');
-
-  const hint = hints.length
-    ? 'SPOTTER: ' + hints.join(' · ') + ' — EDIT & RE-FIRE'
-    : 'SPOTTER: ADJUST & RE-FIRE';
+  const hint = hints.length ? 'SPOTTER: ' + hints.join(' · ') + ' — EDIT & RE-FIRE' : 'SPOTTER: ADJUST & RE-FIRE';
 
   els.compHint.textContent = impactLine + ' · ' + hint;
   els.compHint.classList.add('hot');
-
-  els.bMain.textContent = 'MISS — SHOT ' + S.shotsOnTarget + '/' + MAX_SHOTS_PER_TARGET;
-  els.bMain.className   = 'miss';
-  els.bSub.textContent  = impactLine + '  ·  ADJUST RANGE & WIND, THEN PRESS RE-FIRE';
+  els.bMain.textContent = 'MISS — SHOT ' + t.shotsOnTarget + '/' + MAX_SHOTS;
+  els.bMain.className = 'miss';
+  els.bSub.textContent = impactLine + '  ·  ADJUST RANGE & WIND, THEN RE-FIRE';
   els.banner.classList.add('show');
 
   S.impactFx = {
     t: 0, x: R.impactX, y: R.impactY, hit: false, headshot: false,
-    parts: Array.from({length: 10}, () => ({
+    parts: Array.from({ length: 10 }, () => ({
       x: 0, y: 0,
       vx: (Math.random() - 0.5) * 80,
       vy: -Math.random() * 60 - 10,
@@ -698,878 +1206,618 @@ function enterSpotPhase(){
   };
 }
 
-function resolveTarget(hit){
-  const R = S.pendingResult;
-  S.phase = PHASE.RESULT;
-
-  const rangeErr = Math.abs(S.estRange - S.dist);
+function resolveHit(t, hit) {
+  const R = t.pendingResult;
+  const trueDist = R.targetDist;
+  const rangeErr = Math.abs(S.estRange - trueDist);
   let windErr;
   if (S.estWindDir === S.windDir) windErr = Math.abs(S.estWindSpeed - S.windSpeed);
-  else                            windErr = S.estWindSpeed + S.windSpeed;
+  else windErr = S.estWindSpeed + S.windSpeed;
 
-  const rangePts = Math.max(0, 100 - rangeErr * 1.6);
+  const rangePts = Math.max(0, 100 - rangeErr * 1.2);
   const windPts  = Math.max(0, 100 - windErr * 14);
   const hitPts   = hit ? 100 : 0;
-  const headBonus = R.headshot ? 50 : 0;
-
-  const shotPenalty = Math.max(0.25, 1 - (S.shotsOnTarget - 1) * 0.30);
+  const headBonus = (hit && R.headshot) ? 50 : 0;
+  const shotPenalty = Math.max(0.25, 1 - (t.shotsOnTarget - 1) * 0.30);
   const raw = rangePts * 0.40 + windPts * 0.20 + hitPts * 0.40 + headBonus;
   const total = Math.round(raw * shotPenalty);
-
   S.score += total;
 
+  const headshot = R && R.headshot;
   let label = '', cls = '', subExtra = '';
 
-  if (R.headshot){
-    label = 'HEADSHOT · KILL';
-    cls = 'headshot';
-    S.headshotFlash = 1;
-  } else if (hit){
-    if (rangeErr <= 15 && windErr <= 1.0 && S.shotsOnTarget === 1){
-      label = 'DIRECT HIT · KILL';
-      cls = 'gold';
-    } else if (S.shotsOnTarget === 1){
-      label = 'HIT · KILL';
-      cls = 'hit';
-    } else {
-      label = 'HIT · SHOT ' + S.shotsOnTarget;
-      cls = 'hit';
-    }
+  if (headshot) { label = 'HEADSHOT · KILL'; cls = 'headshot'; S.headshotFlash = 1; }
+  else if (hit) {
+    if (rangeErr <= 15 && windErr <= 1.0 && t.shotsOnTarget === 1) { label = 'DIRECT HIT · KILL'; cls = 'gold'; }
+    else if (t.shotsOnTarget === 1) { label = 'HIT · KILL'; cls = 'hit'; }
+    else { label = 'HIT · SHOT ' + t.shotsOnTarget; cls = 'hit'; }
   } else {
-    label = 'TARGET LOST';
-    cls = 'miss';
-    const dy = R.dy, dx = R.dx;
-    if (Math.abs(dy) > R.halfH) subExtra = dy > 0 ? ' · LOW' : ' · HIGH';
-    else if (Math.abs(dx) > R.halfW) subExtra = dx > 0 ? ' · RIGHT' : ' · LEFT';
+    label = 'TARGET LOST'; cls = 'miss';
+    if (R) {
+      const dy = R.dy, dx = R.dx;
+      if (Math.abs(dy) > R.halfH) subExtra = dy > 0 ? ' · LOW' : ' · HIGH';
+      else if (Math.abs(dx) > R.halfW) subExtra = dx > 0 ? ' · RIGHT' : ' · LEFT';
+    }
   }
 
   els.bMain.textContent = label;
-  els.bMain.className   = cls;
-
-  const bonusTxt = R.headshot ? '  ·  HEADSHOT +50' : '';
-  els.bSub.textContent  =
-    'RNG ERR ' + Math.round(rangeErr) + ' M  ·  WND ERR ' +
-    windErr.toFixed(1) + ' M/S' + subExtra +
-    '  ·  +' + total + ' PTS' + bonusTxt +
-    (S.shotsOnTarget > 1 ? '  (' + S.shotsOnTarget + ' SHOTS)' : '');
+  els.bMain.className = cls;
+  const bonusTxt = headshot ? '  ·  HEADSHOT +50' : '';
+  const remaining = remainingTargets();
+  els.bSub.textContent =
+    'RNG ERR ' + Math.round(rangeErr) + ' M · WND ERR ' + windErr.toFixed(1) +
+    ' M/S' + subExtra + '  ·  +' + total + ' PTS' + bonusTxt +
+    '  ·  ' + remaining + ' REMAINING';
   els.banner.classList.add('show');
 
-  /* ---------- Impact FX: headshot vs normal ---------- */
-  if (R.headshot){
-    /* Bigger, red-and-gold burst for headshot */
+  if (headshot) {
     S.impactFx = {
-      t: 0, x: R.impactX, y: R.impactY,
-      hit: true, headshot: true,
-      parts: Array.from({length: 26}, () => {
-        const ang = Math.random() * Math.PI * 2;
-        const sp  = 60 + Math.random() * 140;
-        return {
-          x: 0, y: 0,
-          vx: Math.cos(ang) * sp,
-          vy: Math.sin(ang) * sp - 40,
-          life: 1,
-          col: Math.random() < 0.5 ? 'red' : 'gold'
-        };
+      t: 0, x: R.impactX, y: R.impactY, hit: true, headshot: true,
+      parts: Array.from({ length: 26 }, () => {
+        const ang = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 140;
+        return { x: 0, y: 0, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40, life: 1, col: Math.random() < 0.5 ? 'red' : 'gold' };
       })
     };
-  } else if (hit){
-    /* Normal impact puff */
+  } else if (hit) {
     S.impactFx = {
-      t: 0, x: R.impactX, y: R.impactY,
-      hit: true, headshot: false,
-      parts: Array.from({length: 14}, () => ({
-        x: 0, y: 0,
-        vx: (Math.random() - 0.5) * 100,
-        vy: -Math.random() * 80 - 10,
-        life: 1,
-        col: 'dust'
+      t: 0, x: R.impactX, y: R.impactY, hit: true, headshot: false,
+      parts: Array.from({ length: 14 }, () => ({
+        x: 0, y: 0, vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 80 - 10, life: 1, col: 'dust'
       }))
     };
   }
 
-  els.compHint.textContent = R.headshot
-    ? 'HEADSHOT CONFIRMED — TARGET ELIMINATED'
-    : (hit ? 'TARGET NEUTRALIZED — LOAD NEXT TARGET' : 'TARGET LOST — LOAD NEXT TARGET');
-  els.compHint.classList.remove('hot');
-  updatePhaseUI();
+  if (remaining > 0) {
+    S.activeIdx = -1;
+    S.phase = PHASE.SELECT;
+    els.compHint.textContent = isTouchDevice ? 'TAP THE NEXT TARGET' : 'CLICK THE NEXT TARGET';
+    els.compHint.classList.remove('hot');
+    updatePhaseUI();
+    setTimeout(() => els.banner.classList.remove('show'), 1800);
+  } else {
+    S.phase = PHASE.RESULT;
+    els.compHint.textContent = 'SESSION CLEAR — ALL TARGETS NEUTRALIZED';
+    els.compHint.classList.remove('hot');
+    updatePhaseUI();
+  }
 }
 
-function update(dt){
-  const inputFocused = document.activeElement === els.range ||
-                       document.activeElement === els.windIn;
-  const panSpeed = 640;
-  if (!inputFocused){
-    if (keys['ArrowLeft']  || keys['a'] || keys['A']) S.panX += panSpeed * dt;
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) S.panX -= panSpeed * dt;
-    if (keys['ArrowUp']    || keys['w'] || keys['W']) S.panY += panSpeed * dt;
-    if (keys['ArrowDown']  || keys['s'] || keys['S']) S.panY -= panSpeed * dt;
+/* =========================================================
+   SCOPE MODE
+   ========================================================= */
+const MODES = {
+  day: {
+    sky: ['#3a6ba5', '#94b8d8', '#d8e4ec'],
+    fogColor: 0xa8c0d8, fogNear: 800, fogFar: 4500,
+    sunColor: 0xfff4dc, sunIntensity: 1.2,
+    retLine: 'rgba(255,255,255,0.85)', retCore: 'rgba(0,0,0,0.96)',
+    lblHalo: 'rgba(255,255,255,0.65)', lblCore: 'rgba(10,12,8,0.98)'
+  },
+  thermal: {
+    sky: ['#050810', '#0a121c', '#141c26'],
+    fogColor: 0x0a1018, fogNear: 600, fogFar: 3500,
+    sunColor: 0xff8040, sunIntensity: 0.8,
+    retLine: 'rgba(220,230,255,0.95)', retCore: 'rgba(0,0,0,0.96)',
+    lblHalo: 'rgba(255,200,150,0.9)', lblCore: 'rgba(20,10,5,0.98)'
+  },
+  night: {
+    sky: ['#030a06', '#061810', '#0e2c1c'],
+    fogColor: 0x061810, fogNear: 600, fogFar: 3500,
+    sunColor: 0x60ff80, sunIntensity: 0.7,
+    retLine: 'rgba(120,255,140,0.95)', retCore: 'rgba(0,15,5,0.96)',
+    lblHalo: 'rgba(120,255,140,0.9)', lblCore: 'rgba(4,20,8,0.98)'
   }
-  clampPan();
+};
+let P = MODES.day;
 
-  if (S.phase === PHASE.RANGE || S.phase === PHASE.WIND ||
-      S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT){
+function setScopeMode(m) {
+  if (S.scopeMode === m) return;
+  S.scopeMode = m;
+  P = MODES[m];
+
+  skyTex.dispose();
+  skyTex = makeSkyTexture(P.sky[0], P.sky[1], P.sky[2]);
+  scene.background = skyTex;
+
+  scene.fog.color.setHex(P.fogColor);
+  scene.fog.near = P.fogNear;
+  scene.fog.far = P.fogFar;
+  sun.color.setHex(P.sunColor);
+  sun.intensity = P.sunIntensity;
+
+  for (const t of S.targets) {
+    if (t.killed) continue;
+    const oldMat = t.sprite.material;
+    if (oldMat.map) oldMat.map.dispose();
+    oldMat.dispose();
+    t.sprite.material = new THREE.SpriteMaterial({
+      map: makeSoldierTexture(t.stance.spriteType, m),
+      transparent: true, depthTest: true, depthWrite: false, fog: true, alphaTest: 0.05
+    });
+  }
+
+  els.modeTint.className = (m === 'day') ? '' : m;
+  [...els.modeRow.children].forEach(b => b.classList.toggle('active', b.dataset.m === m));
+}
+
+/* =========================================================
+   UPDATE
+   ========================================================= */
+function update(dt) {
+  const inputFocused = document.activeElement === els.rangeInput ||
+                       document.activeElement === els.windInput;
+  const ppr = getPixelsPerRadian();
+  const panSpeed = 400;
+  if (!inputFocused) {
+    if (keys['ArrowLeft']  || keys['a'] || keys['A'] || keys['PAD_left'])  S.yaw += panSpeed / ppr * dt;
+    if (keys['ArrowRight'] || keys['d'] || keys['D'] || keys['PAD_right']) S.yaw -= panSpeed / ppr * dt;
+    if (keys['ArrowUp']    || keys['w'] || keys['W'] || keys['PAD_up'])    S.pitch += panSpeed / ppr * dt;
+    if (keys['ArrowDown']  || keys['s'] || keys['S'] || keys['PAD_down'])  S.pitch -= panSpeed / ppr * dt;
+  }
+
+  const maxYaw = Math.PI * 0.6;
+  const maxPitch = Math.PI * 0.25;
+  S.yaw = Math.max(-maxYaw, Math.min(maxYaw, S.yaw));
+  S.pitch = Math.max(-maxPitch, Math.min(maxPitch, S.pitch));
+  camera.rotation.y = S.yaw;
+  camera.rotation.x = S.pitch;
+
+  if (S.phase !== PHASE.SELECT && S.phase !== PHASE.RESULT && S.phase !== PHASE.FIRING) {
     S.time -= dt;
-    if (S.time <= 0){ S.time = 0; timeout(); }
+    if (S.time <= 0) { S.time = 0; timeout(); }
   }
 
   S.anemoTime += dt;
-  const settle    = Math.min(1, S.anemoTime / 2.5);
+  const settle = Math.min(1, S.anemoTime / 2.5);
   const jitterAmp = 0.10 + 1.20 * (1 - settle);
   const j1 = Math.sin(S.anemoTime * 7.3) * 0.45;
   const j2 = Math.sin(S.anemoTime * 13.1 + 1.2) * 0.32;
   const j3 = Math.sin(S.anemoTime * 23.7 + 3.4) * 0.23;
   S.anemoCurrent = Math.max(0, S.windSpeed + (j1 + j2 + j3) * jitterAmp);
-
-  if (S.anemoCurrent > S.anemoPeak || S.anemoTime < 0.15){
-    S.anemoPeak = S.anemoCurrent;
-  } else {
-    S.anemoPeak = Math.max(S.anemoCurrent, S.anemoPeak - dt * 0.6);
-  }
-
+  if (S.anemoCurrent > S.anemoPeak || S.anemoTime < 0.15) S.anemoPeak = S.anemoCurrent;
+  else S.anemoPeak = Math.max(S.anemoCurrent, S.anemoPeak - dt * 0.6);
   S.anemoHistory.push(S.anemoCurrent);
   if (S.anemoHistory.length > 40) S.anemoHistory.shift();
-  const anemoAvg = S.anemoHistory.reduce((a,b) => a+b, 0) / S.anemoHistory.length;
-
+  const anemoAvg = S.anemoHistory.reduce((a, b) => a + b, 0) / S.anemoHistory.length;
   const settled = settle > 0.92;
   els.anemoSpeed.textContent = S.anemoCurrent.toFixed(1);
-  els.anemoSpeed.style.color  = settled ? '#ffbe4d' : '#ff8a5c';
-  els.anemoDir.textContent   = S.windDir === 1 ? 'FROM LEFT →' : '← FROM RIGHT';
-  els.anemoBar.style.width   = Math.min(100, (S.anemoCurrent / 12) * 100) + '%';
-  els.anemoHint.textContent  = settled
-      ? 'AVG ' + anemoAvg.toFixed(1) + ' · PEAK ' + S.anemoPeak.toFixed(1)
-      : 'SAMPLING ' + Math.round(settle * 100) + '%';
-
+  els.anemoSpeed.style.color = settled ? '#ffbe4d' : '#ff8a5c';
+  els.anemoDir.textContent = S.windDir === 1 ? 'FROM LEFT →' : '← FROM RIGHT';
+  els.anemoBar.style.width = Math.min(100, (S.anemoCurrent / 12) * 100) + '%';
+  els.anemoHint.textContent = settled
+    ? 'AVG ' + anemoAvg.toFixed(1) + ' · PEAK ' + S.anemoPeak.toFixed(1)
+    : 'SAMPLING ' + Math.round(settle * 100) + '%';
   const arrowAngle = S.windDir === 1 ? 90 : -90;
   els.anemoArrow.setAttribute('transform', 'rotate(' + arrowAngle + ' 20 20)');
 
-  if (S.bullet){
+  if (S.bullet) {
     S.bullet.t += dt;
     const pr = Math.min(1, S.bullet.t / S.bullet.dur);
-
-    if (!S.bullet.landed){
+    if (!S.bullet.landed) {
       const mt = 1 - pr;
-      const b  = S.bullet;
+      const b = S.bullet;
       const px = mt * mt * b.p0.x + 2 * mt * pr * b.p1.x + pr * pr * b.p2.x;
       const py = mt * mt * b.p0.y + 2 * mt * pr * b.p1.y + pr * pr * b.p2.y;
       b.trail.push({ x: px, y: py, life: 1 });
-
-      if (pr >= 1){
-        S.bullet.landed = true;
-        onBulletLanded();
-      }
+      if (pr >= 1) { S.bullet.landed = true; onBulletLanded(); }
     }
-
     for (const pt of S.bullet.trail) pt.life -= dt * 1.1;
     S.bullet.trail = S.bullet.trail.filter(pt => pt.life > 0);
-
-    if (S.bullet.landed && S.bullet.trail.length === 0){
-      S.bullet = null;
-    }
+    if (S.bullet.landed && S.bullet.trail.length === 0) S.bullet = null;
   }
 
-  if (S.impactFx){
+  if (S.impactFx) {
     S.impactFx.t += dt;
-    for (const p of S.impactFx.parts){
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += 220 * dt;
-      p.life -= dt * 1.5;
+    for (const p of S.impactFx.parts) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vy += 220 * dt; p.life -= dt * 1.5;
     }
     if (S.impactFx.t > 1.8) S.impactFx = null;
   }
 
-  if (S.flash > 0)         S.flash = Math.max(0, S.flash - dt * 3.2);
+  if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 3.2);
   if (S.headshotFlash > 0) S.headshotFlash = Math.max(0, S.headshotFlash - dt * 2.4);
-  if (S.muzzleFlash > 0)   S.muzzleFlash = Math.max(0, S.muzzleFlash - dt * 9);
+  if (S.muzzleFlash > 0) S.muzzleFlash = Math.max(0, S.muzzleFlash - dt * 9);
 
-  els.zoom.textContent    = S.zoom.toFixed(1) + 'X';
-  els.time.textContent    = S.time.toFixed(1);
+  els.zoom.textContent = S.scopeOn ? (S.zoom.toFixed(0) + 'X') : 'IRON';
+  els.time.textContent = S.time.toFixed(1);
   els.timeBar.style.width = (100 * S.time / TIME_MAX) + '%';
-  els.timeBar.style.background = S.time < 12
-      ? '#ff5a3c'
-      : 'linear-gradient(90deg,#9dff8f,#ffbe4d)';
-  els.stats.textContent   = S.hits + ' / ' + S.shots;
-  els.score.textContent   = S.score;
+  els.timeBar.style.background = S.time < 20 ? '#ff5a3c' : 'linear-gradient(90deg,#9dff8f,#ffbe4d)';
+  els.stats.textContent = S.hits + ' / ' + S.shots;
+  els.score.textContent = S.score;
 }
 
-function drawSky(hY){
-  if (hY <= 0) return;
-  const g = ctx.createLinearGradient(0, 0, 0, hY);
-  g.addColorStop(0,    '#2f4a6b');
-  g.addColorStop(0.42, '#7ba0c4');
-  g.addColorStop(0.78, '#c3d8e6');
-  g.addColorStop(1,    '#e4eaec');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, hY);
-
-  ctx.save();
-  ctx.globalAlpha = 0.28;
-  ctx.fillStyle = '#ffffff';
-  const off = -S.panX * 0.012;
-  for (let i = 0; i < 8; i++){
-    const bx = ((i * 420 + 140 + off) % (W + 900) + W + 900) % (W + 900) - 450;
-    const by = 30 + (i % 3) * 40 + S.panY * 0.25;
-    ctx.beginPath();
-    ctx.ellipse(bx, by, 110 + (i % 4) * 34, 12 + (i % 3) * 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(bx + 78, by + 7, 78, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+function timeout() {
+  if (S.phase === PHASE.RANGE) lockRange();
+  if (S.phase === PHASE.WIND) lockWind();
+  if (S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT) fire();
 }
 
-function drawMountains(hY){
-  const off = -S.panX * 0.035;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(-120, hY + 2);
-  for (let x = -120; x <= W + 120; x += 18){
-    const k = Math.sin((x + off) * 0.0031) * 0.5
-            + Math.sin((x + off) * 0.0077 + 1.7) * 0.3
-            + Math.sin((x + off) * 0.0170 + 3.1) * 0.2;
-    ctx.lineTo(x, hY - 6 - (k * 0.5 + 0.5) * 30);
-  }
-  ctx.lineTo(W + 120, hY + 2);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(0, hY - 40, 0, hY);
-  g.addColorStop(0, 'rgba(150,168,182,0.62)');
-  g.addColorStop(1, 'rgba(196,206,212,0.32)');
-  ctx.fillStyle = g;
-  ctx.fill();
-  ctx.restore();
-}
+/* =========================================================
+   RETICLE
+   ========================================================= */
+function drawReticle() {
+  rctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  rctx.clearRect(0, 0, W, H);
 
-function drawGround(hY){
-  if (hY >= H) return;
-  const top = Math.max(0, hY);
-  const g = ctx.createLinearGradient(0, top, 0, H);
-  g.addColorStop(0,    '#f1eee4');
-  g.addColorStop(0.14, '#e5e1d2');
-  g.addColorStop(0.55, '#d0cab7');
-  g.addColorStop(1,    '#aca590');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, top, W, H - top);
+  const cx = W / 2;
+  const cy = H / 2;
 
-  const N = 34;
-  for (let i = 0; i < N; i++){
-    const tt = i / N;
-    const y  = hY + (H - hY) * Math.pow(tt, 2.6) + 0.5;
-    if (y > H || y < 0) continue;
-    const par = -S.panX * (0.05 + tt * 0.85);
-    ctx.strokeStyle = 'rgba(118,110,90,' + (0.045 + tt * 0.12).toFixed(3) + ')';
-    ctx.lineWidth   = 1 + tt * 1.8;
-    ctx.beginPath();
-    const step = 16, span = W + 400;
-    for (let x = -200; x <= span; x += step){
-      const yy = y + Math.sin((x + par) * 0.013 + i * 1.7) * 2.4 * (0.3 + tt);
-      if (x === -200) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
-    }
-    ctx.stroke();
-  }
-}
-
-function drawStandingSoldier(cx, top, h, fill){
-  if (h < 5){
-    ctx.fillStyle = fill;
-    ctx.fillRect(cx - h * 0.14, top, Math.max(1.5, h * 0.28), h);
+  if (!S.scopeOn) {
+    rctx.save();
+    rctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    rctx.lineWidth = 1.5;
+    rctx.beginPath();
+    rctx.moveTo(cx - 10, cy); rctx.lineTo(cx + 10, cy);
+    rctx.moveTo(cx, cy - 10); rctx.lineTo(cx, cy + 10);
+    rctx.stroke();
+    rctx.fillStyle = 'rgba(0,0,0,0.9)';
+    rctx.beginPath(); rctx.arc(cx, cy, 2.5, 0, Math.PI * 2); rctx.fill();
+    rctx.restore();
+    drawSelectionOverlay();
+    drawOffscreenArrows();
     return;
   }
-  ctx.save();
-  ctx.translate(cx, top);
-  ctx.scale(h, h);
-  ctx.fillStyle   = fill;
-  ctx.strokeStyle = fill;
-  ctx.lineCap     = 'round';
-  ctx.lineJoin    = 'round';
 
-  ctx.beginPath(); ctx.ellipse(0, 0.062, 0.062, 0.052, 0, Math.PI, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, 0.066, 0.079, 0.016, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, 0.100, 0.036, 0.038, 0, 0, Math.PI * 2); ctx.fill();
+  const mpx = milPx();
+  const P_ = P;
 
-  ctx.beginPath();
-  ctx.moveTo(-0.088, 0.135); ctx.lineTo( 0.088, 0.135);
-  ctx.lineTo( 0.078, 0.280); ctx.lineTo( 0.070, 0.460);
-  ctx.lineTo(-0.070, 0.460); ctx.lineTo(-0.078, 0.280);
-  ctx.closePath(); ctx.fill();
-
-  ctx.save();
-  ctx.translate(-0.012, 0.330);
-  ctx.rotate(-0.62);
-  ctx.fillRect(-0.260, -0.013, 0.520, 0.026);
-  ctx.fillRect(-0.030,  0.013, 0.050, 0.055);
-  ctx.restore();
-
-  ctx.lineWidth = 0.045;
-  ctx.beginPath();
-  ctx.moveTo(-0.076, 0.160); ctx.lineTo(-0.120, 0.300); ctx.lineTo(0.050, 0.360);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo( 0.076, 0.160); ctx.lineTo( 0.112, 0.300); ctx.lineTo(0.030, 0.400);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-0.068, 0.440); ctx.lineTo(-0.008, 0.440);
-  ctx.lineTo(-0.018, 0.720); ctx.lineTo(-0.030, 0.960);
-  ctx.lineTo(-0.088, 0.960); ctx.lineTo(-0.082, 0.720);
-  ctx.closePath(); ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo( 0.008, 0.440); ctx.lineTo( 0.068, 0.440);
-  ctx.lineTo( 0.082, 0.720); ctx.lineTo( 0.088, 0.960);
-  ctx.lineTo( 0.030, 0.960); ctx.lineTo( 0.018, 0.720);
-  ctx.closePath(); ctx.fill();
-
-  ctx.fillRect(-0.104, 0.948, 0.078, 0.032);
-  ctx.fillRect( 0.026, 0.948, 0.082, 0.032);
-
-  ctx.restore();
-}
-
-function drawProneSoldier(cx, groundY, h, fill){
-  const headR    = h * 0.22;
-  const headCY   = groundY - h * 0.75;
-  const shoulderH = h * 0.45;
-  const topW     = h * 0.42;
-  const botW     = h * 0.72;
-
-  ctx.save();
-  ctx.fillStyle   = fill;
-  ctx.strokeStyle = fill;
-  ctx.lineCap     = 'round';
-  ctx.lineJoin    = 'round';
-
-  ctx.beginPath();
-  ctx.moveTo(cx - botW, groundY + 1);
-  ctx.quadraticCurveTo(
-    cx - topW * 1.05, groundY - shoulderH,
-    cx - topW * 0.60, groundY - shoulderH * 1.05
-  );
-  ctx.lineTo(cx + topW * 0.60, groundY - shoulderH * 1.05);
-  ctx.quadraticCurveTo(
-    cx + topW * 1.05, groundY - shoulderH,
-    cx + botW, groundY + 1
-  );
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillRect(cx - headR * 0.55, headCY + headR * 0.30,
-               headR * 1.10, headR * 0.9);
-
-  ctx.beginPath();
-  ctx.arc(cx, headCY, headR, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.ellipse(cx, headCY - headR * 0.12,
-              headR * 1.15, headR * 0.95,
-              0, Math.PI, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillRect(cx - headR * 1.28, headCY - headR * 0.12,
-               headR * 2.56, headR * 0.22);
-
-  ctx.fillRect(cx + topW * 0.30, groundY - shoulderH * 0.65,
-               h * 0.55, h * 0.045);
-  ctx.fillRect(cx + topW * 0.30 + h * 0.10, groundY - shoulderH * 0.75,
-               h * 0.06, h * 0.06);
-
-  ctx.restore();
-}
-
-function drawTarget(hY, cx){
-  const ppm = FOCAL * S.zoom / S.dist;
-  const h   = S.stance.height * ppm;
-  const sx  = cx + S.lateral * ppm + S.panX;
-  const sy  = hY;
-
-  S.tx = sx; S.ty = sy; S.th = h;
-
-  if (sx < 60 || sx > W - 60){
-    const ex = sx < 60 ? 46 : W - 46;
-    ctx.save();
-    ctx.translate(ex, hY);
-    if (sx > W - 60) ctx.scale(-1, 1);
-    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 170);
-    ctx.fillStyle = '#ffbe4d';
-    ctx.beginPath();
-    ctx.moveTo(-15, -13); ctx.lineTo(15, 0); ctx.lineTo(-15, 13);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+  function line(x1, y1, x2, y2, w) {
+    rctx.strokeStyle = P_.retLine;
+    rctx.lineWidth = w + 3;
+    rctx.beginPath(); rctx.moveTo(x1, y1); rctx.lineTo(x2, y2); rctx.stroke();
+    rctx.strokeStyle = P_.retCore;
+    rctx.lineWidth = w;
+    rctx.beginPath(); rctx.moveTo(x1, y1); rctx.lineTo(x2, y2); rctx.stroke();
+  }
+  function dot(x, y, r) {
+    rctx.fillStyle = P_.retLine;
+    rctx.beginPath(); rctx.arc(x, y, r + 1.5, 0, Math.PI * 2); rctx.fill();
+    rctx.fillStyle = P_.retCore;
+    rctx.beginPath(); rctx.arc(x, y, r, 0, Math.PI * 2); rctx.fill();
   }
 
-  if (sx < -400 || sx > W + 400) return;
-
-  const haze = Math.max(0, Math.min(0.55, (S.dist - 380) / 1100));
-  const r = Math.round(38 + (205 - 38) * haze);
-  const g = Math.round(40 + (205 - 40) * haze);
-  const b = Math.round(34 + (196 - 34) * haze);
-  const fill = 'rgb(' + r + ',' + g + ',' + b + ')';
-
-  if (S.stance === STANCES.STANDING) {
-    drawStandingSoldier(sx, sy - h, h, fill);
-  } else {
-    drawProneSoldier(sx, sy, h, fill);
-  }
-}
-
-function drawReticle(cx, cy){
-  const z   = S.zoom;
-  const MPX = milPx();
-
-  function line(x1, y1, x2, y2, w){
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = w + 3;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,0.96)';
-    ctx.lineWidth = w;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  }
-  function dot(x, y, r){
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.95)';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  ctx.save();
-  ctx.lineCap = 'butt';
+  rctx.save();
+  rctx.lineCap = 'butt';
 
   const gap = 12;
-  line(0,        cy, cx - gap, cy, 1.8);
-  line(cx + gap, cy, W,        cy, 1.8);
-  line(cx, 0,        cx, cy - gap, 1.8);
-  line(cx, cy + gap, cx, H,        1.8);
+  line(0, cy, cx - gap, cy, 1.8);
+  line(cx + gap, cy, W, cy, 1.8);
+  line(cx, 0, cx, cy - gap, 1.8);
+  line(cx, cy + gap, cx, H, 1.8);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.98)';
-  ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,1)';
-  ctx.beginPath(); ctx.arc(cx, cy, 2.8, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,190,80,1)';
-  ctx.beginPath(); ctx.arc(cx, cy, 1.3, 0, Math.PI * 2); ctx.fill();
+  rctx.fillStyle = P_.retLine;
+  rctx.beginPath(); rctx.arc(cx, cy, 4.5, 0, Math.PI * 2); rctx.fill();
+  rctx.fillStyle = P_.retCore;
+  rctx.beginPath(); rctx.arc(cx, cy, 2.8, 0, Math.PI * 2); rctx.fill();
+  rctx.fillStyle = 'rgba(255,190,80,1)';
+  rctx.beginPath(); rctx.arc(cx, cy, 1.3, 0, Math.PI * 2); rctx.fill();
 
-  for (let i = 1; i <= 4; i++){
-    const dx = i * MPX;
-    if (dx > 400) break;
+  /* Mil dots 1..6 each direction */
+  for (let i = 1; i <= 6; i++) {
+    const dx = i * mpx;
+    if (dx > W / 2 - 20) break;
     dot(cx - dx, cy, 2.4);
     dot(cx + dx, cy, 2.4);
   }
-  for (let i = 1; i <= 3; i++){
-    const dy = i * MPX;
-    if (dy > 320) break;
+  for (let i = 1; i <= 6; i++) {
+    const dy = i * mpx;
+    if (dy > H / 2 - 20) break;
     dot(cx, cy - dy, 2.4);
     dot(cx, cy + dy, 2.4);
   }
 
-  const x0   = cx + 34;
-  const gapL = Math.max(34, 42 - (z - 4) * 0.8);
-
-  for (let i = 0; i < LADDER.length; i++){
-    const R   = LADDER[i];
-    const x   = x0 + i * gapL;
-    const hh  = 1.8 * FOCAL * z / R;
+  /* Standing ladder */
+  const LADDER = [300, 400, 500, 600, 700, 800, 1000, 1200];
+  const x0 = cx + 34;
+  const gapL = Math.max(24, 42 - (S.zoom / 4) * 2);
+  const k = mpx * 1000;
+  for (let i = 0; i < LADDER.length; i++) {
+    const R = LADDER[i];
+    const x = x0 + i * gapL;
+    const hh = STANCES.STANDING.height * k / R;
     const top = cy - hh / 2;
     const bot = cy + hh / 2;
     const major = (R % 200 === 0);
-
     line(x, top, x, bot, major ? 2.6 : 1.3);
-
-    if (major){
+    if (major) {
       line(x - 10, top, x + 10, top, 2.2);
       line(x - 10, bot, x + 10, bot, 2.2);
-      const label = String(R / 100);
-      ctx.font = 'bold 15px "Courier New", monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.fillText(label, x + 1, top - 9);
-      ctx.fillStyle = 'rgba(10,12,8,0.98)';
-      ctx.fillText(label, x, top - 10);
+      const label = R >= 1000 ? (R / 1000).toFixed(1) : String(R / 100);
+      rctx.font = 'bold 14px "Courier New", monospace';
+      rctx.textAlign = 'center';
+      rctx.textBaseline = 'bottom';
+      rctx.fillStyle = P_.lblHalo;
+      rctx.fillText(label, x + 1, top - 9);
+      rctx.fillStyle = P_.lblCore;
+      rctx.fillText(label, x, top - 10);
     }
   }
-  ctx.font = '9px "Courier New", monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillText('STANDING +X', x0 - 6, cy - 92 * (z / 4));
+  rctx.font = '9px "Courier New", monospace';
+  rctx.textAlign = 'left';
+  rctx.textBaseline = 'bottom';
+  rctx.fillStyle = P_.lblHalo;
+  rctx.fillText('STANDING (×100 M)', x0 - 6, cy - 92 * (S.zoom / 4));
 
-  const PRONE_RANGES = [400, 600, 800];
-  const markSpacing  = [55, 120, 195];
+  /* Prone ladder (−Y) */
+  const PRONE_RANGES = [300, 500, 700];
+  const markSpacing = [50, 110, 175];
+  rctx.font = 'bold 9px "Courier New", monospace';
+  rctx.textAlign = 'left';
+  rctx.textBaseline = 'top';
+  rctx.fillStyle = P_.lblHalo;
+  rctx.fillText('PRONE −Y', cx + 55, cy + 12);
 
-  ctx.font = 'bold 9px "Courier New", monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillText('PRONE −Y', cx + 55, cy + 12);
-
-  for (let i = 0; i < PRONE_RANGES.length; i++){
-    const R    = PRONE_RANGES[i];
-    const ppm  = FOCAL * z / R;
-    const y    = cy + markSpacing[i];
-
-    const shoulderHalfW = Math.max(8, 0.30 * ppm * 1.4);
-    const headR         = Math.max(3.0, 0.10 * ppm * 1.4);
-    const headGap       = Math.max(11, 0.30 * ppm * 1.4);
+  for (let i = 0; i < PRONE_RANGES.length; i++) {
+    const R = PRONE_RANGES[i];
+    const y = cy + markSpacing[i];
+    const shoulderHalfW = Math.max(10, STANCES.PRONE.width / 2 * k / R * 0.9);
+    const headR = Math.max(4.0, 0.18 * k / R);
+    const headGap = Math.max(14, 0.35 * k / R);
 
     line(cx - shoulderHalfW, y, cx + shoulderHalfW, y, 1.6);
     dot(cx - shoulderHalfW, y, 2.6);
     dot(cx + shoulderHalfW, y, 2.6);
 
-    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-    ctx.lineWidth = 0.8;
-    ctx.setLineDash([2, 3]);
-    ctx.beginPath();
-    ctx.moveTo(cx, y - 1);
-    ctx.lineTo(cx, y - headGap);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    rctx.strokeStyle = P_.retCore;
+    rctx.lineWidth = 0.8;
+    rctx.setLineDash([2, 3]);
+    rctx.beginPath(); rctx.moveTo(cx, y - 1); rctx.lineTo(cx, y - headGap); rctx.stroke();
+    rctx.setLineDash([]);
 
     dot(cx, y - headGap, headR);
 
-    const label = String(R / 100);
-    ctx.font = 'bold 15px "Courier New", monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,255,255,0.70)';
-    ctx.fillText(label, cx + shoulderHalfW + 14, y);
-    ctx.fillStyle = 'rgba(10,12,8,0.98)';
-    ctx.fillText(label, cx + shoulderHalfW + 13, y);
+    const label = R >= 1000 ? (R / 1000).toFixed(1) : String(R / 100);
+    rctx.font = 'bold 14px "Courier New", monospace';
+    rctx.textAlign = 'left';
+    rctx.textBaseline = 'middle';
+    rctx.fillStyle = P_.lblHalo;
+    rctx.fillText(label, cx + shoulderHalfW + 14, y);
+    rctx.fillStyle = P_.lblCore;
+    rctx.fillText(label, cx + shoulderHalfW + 13, y);
   }
 
-  ctx.restore();
-}
+  /* Ghost aim marker — where the bullet will land */
+  if ((S.phase === PHASE.SOLUTION || S.phase === PHASE.SPOT || S.phase === PHASE.FIRING) &&
+      S.activeIdx >= 0) {
+    const t = S.targets[S.activeIdx];
+    if (t && !t.killed) {
+      const hold = holdoverMils(S.estRange);
+      const drift = S.estWindDir * driftMils(S.estRange, S.estWindSpeed);
+      const mx = cx + drift * mpx;
+      const my = cy + hold * mpx;
 
-function drawGhost(cx, cy){
-  if (S.phase !== PHASE.SOLUTION && S.phase !== PHASE.FIRING && S.phase !== PHASE.SPOT) return;
+      const gh = t.stance.height * k / S.estRange;
+      const gw = t.stance.width * k / S.estRange;
+      const halfW = Math.max(14, gw / 2);
+      const halfH = Math.max(16, gh / 2);
 
-  const MPX = milPx();
-  const hold  = holdoverMils(S.estRange);
-  const drift = S.estWindDir * driftMils(S.estRange, S.estWindSpeed);
+      const CYAN = 'rgba(90,230,255,0.98)';
+      const CYAN_DIM = 'rgba(90,230,255,0.65)';
 
-  const mx = cx + drift * MPX;
-  const my = cy + hold  * MPX;
+      /* Bright bullseye center */
+      rctx.save();
+      rctx.fillStyle = CYAN;
+      rctx.shadowColor = 'rgba(90,230,255,1)';
+      rctx.shadowBlur = 18;
+      rctx.beginPath(); rctx.arc(mx, my, 5, 0, Math.PI * 2); rctx.fill();
+      rctx.fillStyle = '#0a1a20';
+      rctx.beginPath(); rctx.arc(mx, my, 2.5, 0, Math.PI * 2); rctx.fill();
+      rctx.restore();
 
-  const ppm = FOCAL * S.zoom / S.estRange;
-  const h = Math.max(18, S.stance.height * ppm);
+      /* Bracket corners */
+      rctx.strokeStyle = CYAN;
+      rctx.lineWidth = 3;
+      rctx.shadowColor = 'rgba(90,230,255,1)';
+      rctx.shadowBlur = 14;
 
-  const halfW = S.stance === STANCES.PRONE ? h * 0.72 : h * 0.28;
-  const halfH = h / 2;
+      const cl = Math.min(18, halfW * 0.7);
+      const corners = [
+        [mx - halfW, my - halfH, 1, 1],
+        [mx + halfW, my - halfH, -1, 1],
+        [mx - halfW, my + halfH, 1, -1],
+        [mx + halfW, my + halfH, -1, -1]
+      ];
+      for (const [px, py, sx, sy] of corners) {
+        rctx.beginPath();
+        rctx.moveTo(px + sx * cl, py);
+        rctx.lineTo(px, py);
+        rctx.lineTo(px, py + sy * cl);
+        rctx.stroke();
+      }
 
-  ctx.save();
+      /* Dashed leader from crosshair */
+      rctx.shadowBlur = 0;
+      rctx.strokeStyle = CYAN_DIM;
+      rctx.lineWidth = 1.6;
+      rctx.setLineDash([4, 6]);
+      rctx.beginPath(); rctx.moveTo(cx, cy); rctx.lineTo(mx, my); rctx.stroke();
+      rctx.setLineDash([]);
 
-  const CYAN     = 'rgba(90,230,255,0.95)';
-  const CYAN_DIM = 'rgba(90,230,255,0.35)';
-
-  ctx.strokeStyle = CYAN;
-  ctx.lineWidth = 2;
-  ctx.shadowColor = 'rgba(90,230,255,0.9)';
-  ctx.shadowBlur = 10;
-
-  const cl = Math.min(14, halfW * 0.6);
-  const corners = [
-    [mx - halfW, my - halfH,  1,  1],
-    [mx + halfW, my - halfH, -1,  1],
-    [mx - halfW, my + halfH,  1, -1],
-    [mx + halfW, my + halfH, -1, -1]
-  ];
-  for (const [px, py, sx, sy] of corners){
-    ctx.beginPath();
-    ctx.moveTo(px + sx * cl, py);
-    ctx.lineTo(px, py);
-    ctx.lineTo(px, py + sy * cl);
-    ctx.stroke();
+      /* Label */
+      rctx.font = 'bold 12px "Courier New", monospace';
+      rctx.textAlign = 'center';
+      rctx.textBaseline = 'bottom';
+      rctx.fillStyle = CYAN;
+      rctx.fillText('AIM HERE', mx, my - halfH - 8);
+      rctx.font = '10px "Courier New", monospace';
+      rctx.textBaseline = 'top';
+      rctx.fillText(hold.toFixed(1) + '↓  ' + (drift >= 0 ? drift.toFixed(1) + '→' : Math.abs(drift).toFixed(1) + '←'), mx, my + halfH + 4);
+    }
   }
 
-  ctx.beginPath();
-  ctx.moveTo(mx - 7, my); ctx.lineTo(mx + 7, my);
-  ctx.moveTo(mx, my - 7); ctx.lineTo(mx, my + 7);
-  ctx.stroke();
+  drawSelectionOverlay();
+  drawBulletTrail();
+  drawImpactFx();
+  drawMuzzleAndFlash();
+  drawOffscreenArrows();
 
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = CYAN_DIM;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 5]);
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(mx, my);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.font = 'bold 10px "Courier New", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = CYAN;
-  ctx.fillText('AIM HERE', mx, my - halfH - 8);
-
-  ctx.restore();
+  rctx.restore();
 }
 
-function drawBullet(){
-  if (!S.bullet) return;
+function drawSelectionOverlay() {
+  if (S.phase !== PHASE.SELECT) return;
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+  for (const t of S.targets) {
+    if (t.killed) continue;
+    const b = targetScreenBounds(t);
+    if (!b) continue;
+    if (b.cx < 40 || b.cx > W - 40) continue;
+    rctx.strokeStyle = 'rgba(90,230,255,' + (0.35 + 0.4 * pulse).toFixed(3) + ')';
+    rctx.lineWidth = 1.8;
+    rctx.setLineDash([6, 5]);
+    rctx.shadowColor = 'rgba(90,230,255,0.75)';
+    rctx.shadowBlur = 8 + 6 * pulse;
+    const bw = Math.max(30, b.w * 0.9);
+    const bh = Math.max(36, b.h * 1.1);
+    rctx.beginPath();
+    rctx.rect(b.cx - bw / 2, b.cy - bh / 2, bw, bh);
+    rctx.stroke();
+    rctx.setLineDash([]);
+    rctx.shadowBlur = 0;
+  }
+}
+
+function drawBulletTrail() {
+  if (!S.bullet || S.bullet.trail.length < 2) return;
   const tr = S.bullet.trail;
-  if (tr.length < 2) return;
-
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  for (let i = 1; i < tr.length; i++){
+  rctx.save();
+  rctx.lineCap = 'round';
+  rctx.lineJoin = 'round';
+  for (let i = 1; i < tr.length; i++) {
     const a = tr[i - 1], b = tr[i];
     const alpha = b.life * 0.95;
     if (alpha <= 0.01) continue;
-
-    ctx.strokeStyle = 'rgba(255,150,50,' + (alpha * 0.40).toFixed(3) + ')';
-    ctx.lineWidth = 3 + b.life * 7;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(255,245,200,' + alpha.toFixed(3) + ')';
-    ctx.lineWidth = 1.2 + b.life * 2.8;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    rctx.strokeStyle = 'rgba(255,150,50,' + (alpha * 0.40).toFixed(3) + ')';
+    rctx.lineWidth = 3 + b.life * 7;
+    rctx.beginPath(); rctx.moveTo(a.x, a.y); rctx.lineTo(b.x, b.y); rctx.stroke();
+    rctx.strokeStyle = 'rgba(255,245,200,' + alpha.toFixed(3) + ')';
+    rctx.lineWidth = 1.2 + b.life * 2.8;
+    rctx.beginPath(); rctx.moveTo(a.x, a.y); rctx.lineTo(b.x, b.y); rctx.stroke();
   }
-
-  if (!S.bullet.landed){
+  if (!S.bullet.landed) {
     const head = tr[tr.length - 1];
-    ctx.fillStyle = 'rgba(255,255,230,0.98)';
-    ctx.beginPath(); ctx.arc(head.x, head.y, 3.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,180,80,0.35)';
-    ctx.beginPath(); ctx.arc(head.x, head.y, 12, 0, Math.PI * 2); ctx.fill();
+    rctx.fillStyle = 'rgba(255,255,230,0.98)';
+    rctx.beginPath(); rctx.arc(head.x, head.y, 3.4, 0, Math.PI * 2); rctx.fill();
+    rctx.fillStyle = 'rgba(255,180,80,0.35)';
+    rctx.beginPath(); rctx.arc(head.x, head.y, 12, 0, Math.PI * 2); rctx.fill();
   }
-  ctx.restore();
+  rctx.restore();
 }
 
-/* =========================================================
-   IMPACT FX — different for headshot vs body kill vs miss
-   ========================================================= */
-function drawImpact(){
+function drawImpactFx() {
   if (!S.impactFx) return;
   const fx = S.impactFx;
-  const k = Math.min(1, fx.t / 0.45);
-
-  ctx.save();
-
-  /* Expanding ring */
-  ctx.globalAlpha = (1 - k) * 0.85;
-  if (fx.headshot)       ctx.strokeStyle = 'rgba(255,60,60,0.95)';
-  else if (fx.hit)       ctx.strokeStyle = 'rgba(255,90,60,0.95)';
-  else                   ctx.strokeStyle = 'rgba(220,210,180,0.9)';
-  ctx.lineWidth = fx.headshot ? 3.5 : 2.5;
-  ctx.beginPath();
-  ctx.arc(fx.x, fx.y, 6 + k * (fx.headshot ? 80 : 46), 0, Math.PI * 2);
-  ctx.stroke();
-
-  /* Second ring for headshot */
-  if (fx.headshot){
-    ctx.globalAlpha = (1 - k) * 0.7;
-    ctx.strokeStyle = 'rgba(255,200,80,0.95)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(fx.x, fx.y, 6 + k * 120, 0, Math.PI * 2);
-    ctx.stroke();
+  const k2 = Math.min(1, fx.t / 0.45);
+  rctx.save();
+  rctx.globalAlpha = (1 - k2) * 0.85;
+  rctx.strokeStyle = fx.headshot ? 'rgba(255,60,60,0.95)' : (fx.hit ? 'rgba(255,90,60,0.95)' : 'rgba(220,210,180,0.9)');
+  rctx.lineWidth = fx.headshot ? 3.5 : 2.5;
+  rctx.beginPath(); rctx.arc(fx.x, fx.y, 6 + k2 * (fx.headshot ? 80 : 46), 0, Math.PI * 2); rctx.stroke();
+  if (fx.headshot) {
+    rctx.globalAlpha = (1 - k2) * 0.7;
+    rctx.strokeStyle = 'rgba(255,200,80,0.95)';
+    rctx.lineWidth = 2;
+    rctx.beginPath(); rctx.arc(fx.x, fx.y, 6 + k2 * 120, 0, Math.PI * 2); rctx.stroke();
   }
-
-  /* Central flash */
-  ctx.globalAlpha = Math.max(0, 1 - fx.t / 1.4) * 0.55;
-  if (fx.headshot)       ctx.fillStyle = 'rgba(255,60,60,1)';
-  else if (fx.hit)       ctx.fillStyle = 'rgba(190,80,60,1)';
-  else                   ctx.fillStyle = 'rgba(205,195,170,1)';
-  ctx.beginPath();
-  ctx.arc(fx.x, fx.y, 4 + k * (fx.headshot ? 28 : 16), 0, Math.PI * 2);
-  ctx.fill();
-
-  /* Particles */
-  for (const p of fx.parts){
+  rctx.globalAlpha = Math.max(0, 1 - fx.t / 1.4) * 0.55;
+  rctx.fillStyle = fx.headshot ? 'rgba(255,60,60,1)' : (fx.hit ? 'rgba(190,80,60,1)' : 'rgba(205,195,170,1)');
+  rctx.beginPath(); rctx.arc(fx.x, fx.y, 4 + k2 * (fx.headshot ? 28 : 16), 0, Math.PI * 2); rctx.fill();
+  for (const p of fx.parts) {
     if (p.life <= 0) continue;
-    ctx.globalAlpha = p.life * 0.95;
-
-    if (fx.headshot && p.col === 'red'){
-      ctx.fillStyle = 'rgba(255,70,70,1)';
-      ctx.shadowColor = 'rgba(255,80,60,0.9)';
-      ctx.shadowBlur = 12;
-    } else if (fx.headshot && p.col === 'gold'){
-      ctx.fillStyle = 'rgba(255,210,80,1)';
-      ctx.shadowColor = 'rgba(255,200,80,0.9)';
-      ctx.shadowBlur = 12;
-    } else if (fx.hit){
-      ctx.fillStyle = 'rgba(255,110,70,1)';
-      ctx.shadowBlur = 0;
-    } else {
-      ctx.fillStyle = 'rgba(200,190,165,1)';
-      ctx.shadowBlur = 0;
-    }
-
-    const radius = fx.headshot
-      ? (2.2 + p.life * 3.5)
-      : (1.6 + p.life * 2);
-
-    ctx.beginPath();
-    ctx.arc(fx.x + p.x, fx.y + p.y, radius, 0, Math.PI * 2);
-    ctx.fill();
+    rctx.globalAlpha = p.life * 0.95;
+    if (fx.headshot && p.col === 'red') { rctx.fillStyle = 'rgba(255,70,70,1)'; rctx.shadowColor = 'rgba(255,80,60,0.9)'; rctx.shadowBlur = 12; }
+    else if (fx.headshot && p.col === 'gold') { rctx.fillStyle = 'rgba(255,210,80,1)'; rctx.shadowColor = 'rgba(255,200,80,0.9)'; rctx.shadowBlur = 12; }
+    else if (fx.hit) { rctx.fillStyle = 'rgba(255,110,70,1)'; rctx.shadowBlur = 0; }
+    else { rctx.fillStyle = 'rgba(200,190,165,1)'; rctx.shadowBlur = 0; }
+    const radius = fx.headshot ? (2.2 + p.life * 3.5) : (1.6 + p.life * 2);
+    rctx.beginPath(); rctx.arc(fx.x + p.x, fx.y + p.y, radius, 0, Math.PI * 2); rctx.fill();
   }
-
-  ctx.restore();
+  rctx.restore();
 }
 
-const dust = [];
-for (let i = 0; i < 90; i++){
-  dust.push({
-    x: Math.random() * 2000 - 500,
-    y: Math.random(),
-    depth: 0.15 + Math.random() * 0.85,
-    size: 0.6 + Math.random() * 1.6,
-    ph: Math.random() * 6.28
-  });
-}
-function drawDust(hY, dt, time){
-  const groundH = H - hY;
-  if (groundH <= 4) return;
-  const strength = Math.min(1, S.windSpeed / 8);
-  if (strength < 0.02) return;
-
-  ctx.save();
-  ctx.lineCap = 'round';
-  for (const p of dust){
-    p.x += S.windDir * S.windSpeed * p.depth * 26 * dt;
-    if (p.x > W + 60) p.x -= W + 120;
-    if (p.x < -60)    p.x += W + 120;
-
-    const frac = Math.pow(p.y, 1.6);
-    const y = hY + groundH * frac + Math.sin(time * 1.4 + p.ph) * 1.5;
-    const alpha = strength * (0.06 + p.depth * 0.16) * (1 - frac * 0.55);
-    const streak = S.windSpeed * p.depth * 1.6;
-
-    ctx.strokeStyle = 'rgba(215,205,180,' + alpha.toFixed(3) + ')';
-    ctx.lineWidth = p.size * (0.6 + p.depth);
-    ctx.beginPath();
-    ctx.moveTo(p.x, y);
-    ctx.lineTo(p.x + S.windDir * streak, y + (Math.random() - 0.5) * 0.6);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawWindsock(hY, cx){
-  const d = 600;
-  const ppm = FOCAL * S.zoom / d;
-  const sx = cx + S.panX;
-  if (sx < -300 || sx > W + 300) return;
-
-  const baseY = hY;
-  const poleH = 2.2 * ppm;
-  const topY  = baseY - poleH;
-
-  ctx.strokeStyle = 'rgba(45,42,36,0.92)';
-  ctx.lineWidth = Math.max(1, 0.055 * ppm);
-  ctx.beginPath();
-  ctx.moveTo(sx, baseY);
-  ctx.lineTo(sx, topY);
-  ctx.stroke();
-
-  const w     = Math.min(1, S.windSpeed / 10);
-  const theta = (1 - Math.pow(w, 0.7)) * Math.PI / 2;
-  const sockL = 0.95 * ppm;
-  const dir   = S.windDir;
-
-  const tipX = sx + Math.cos(theta) * sockL * dir;
-  const tipY = topY + Math.sin(theta) * sockL;
-
-  const ax = tipX - sx, ay = tipY - topY;
-  const len = Math.hypot(ax, ay) || 1;
-  const nx = -ay / len, ny = ax / len;
-  const w0 = 0.14 * ppm;
-
-  ctx.beginPath();
-  ctx.moveTo(sx + nx * w0,          topY + ny * w0);
-  ctx.lineTo(tipX + nx * w0 * 0.28, tipY + ny * w0 * 0.28);
-  ctx.lineTo(tipX - nx * w0 * 0.28, tipY - ny * w0 * 0.28);
-  ctx.lineTo(sx - nx * w0,          topY - ny * w0);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(255,182,64,0.88)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(35,28,16,0.85)';
-  ctx.lineWidth = Math.max(0.5, 0.012 * ppm);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(sx + nx * w0 * 0.65,    topY + ny * w0 * 0.65);
-  ctx.lineTo(tipX + nx * w0 * 0.18,  tipY + ny * w0 * 0.18);
-  ctx.lineTo(tipX - nx * w0 * 0.18,  tipY - ny * w0 * 0.18);
-  ctx.lineTo(sx - nx * w0 * 0.65,    topY - ny * w0 * 0.65);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(230,60,40,0.65)';
-  ctx.fill();
-}
-
-function draw(time, dt){
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-
+function drawMuzzleAndFlash() {
   const cx = W / 2;
-  const cy = H / 2;
-  const hY = cy + S.panY;
-
-  drawSky(hY);
-  drawMountains(hY);
-  drawGround(hY);
-  drawDust(hY, dt, time);
-  drawWindsock(hY, cx);
-  drawTarget(hY, cx);
-
-  drawReticle(cx, cy);
-  drawGhost(cx, cy);
-
-  drawBullet();
-  drawImpact();
-
-  if (S.muzzleFlash > 0){
-    ctx.save();
-    ctx.globalAlpha = S.muzzleFlash * 0.28;
-    const g = ctx.createRadialGradient(cx, H * 0.95, 10, cx, H * 0.95, H * 0.6);
+  if (S.muzzleFlash > 0) {
+    rctx.save();
+    rctx.globalAlpha = S.muzzleFlash * 0.28;
+    const g = rctx.createRadialGradient(cx, H * 0.95, 10, cx, H * 0.95, H * 0.6);
     g.addColorStop(0, 'rgba(255,220,150,1)');
     g.addColorStop(1, 'rgba(255,150,50,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    rctx.fillStyle = g;
+    rctx.fillRect(0, 0, W, H);
+    rctx.restore();
   }
-  if (S.flash > 0){
-    ctx.save();
-    ctx.globalAlpha = S.flash * 0.30;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+  if (S.flash > 0) {
+    rctx.save();
+    rctx.globalAlpha = S.flash * 0.30;
+    rctx.fillStyle = '#ffffff';
+    rctx.fillRect(0, 0, W, H);
+    rctx.restore();
   }
-
-  /* Red radial flash on headshot */
-  if (S.headshotFlash > 0){
-    ctx.save();
-    ctx.globalAlpha = S.headshotFlash * 0.55;
-    const g = ctx.createRadialGradient(cx, cy, 40, cx, cy, Math.max(W, H) * 0.7);
+  if (S.headshotFlash > 0) {
+    rctx.save();
+    rctx.globalAlpha = S.headshotFlash * 0.55;
+    const g = rctx.createRadialGradient(cx, H/2, 40, cx, H/2, Math.max(W, H) * 0.7);
     g.addColorStop(0, 'rgba(255,60,60,0.9)');
     g.addColorStop(0.5, 'rgba(255,90,40,0.35)');
     g.addColorStop(1, 'rgba(255,40,40,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+    rctx.fillStyle = g;
+    rctx.fillRect(0, 0, W, H);
+    rctx.restore();
   }
 }
 
+function drawOffscreenArrows() {
+  for (const t of S.targets) {
+    if (t.killed) continue;
+    const b = targetScreenBounds(t);
+    if (!b) continue;
+    if (b.cx < 60 || b.cx > W - 60) {
+      const ex = b.cx < 60 ? 46 : W - 46;
+      rctx.save();
+      rctx.translate(ex, b.cy);
+      if (b.cx > W - 60) rctx.scale(-1, 1);
+      rctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 170);
+      rctx.fillStyle = '#ffbe4d';
+      rctx.beginPath();
+      rctx.moveTo(-15, -13); rctx.lineTo(15, 0); rctx.lineTo(-15, 13);
+      rctx.closePath(); rctx.fill();
+      rctx.restore();
+    }
+  }
+}
+
+/* =========================================================
+   RENDER LOOP
+   ========================================================= */
 let last = performance.now();
-function loop(now){
+function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   update(dt);
-  draw(now / 1000, dt);
+  renderer.render(scene, camera);
+  drawReticle();
   requestAnimationFrame(loop);
 }
 
+/* =========================================================
+   WIRE UP
+   ========================================================= */
 els.zoomRow.addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   setZoom(parseInt(btn.dataset.z, 10));
 });
+els.modeRow.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  setScopeMode(btn.dataset.m);
+});
 els.lockRange.addEventListener('click', lockRange);
 els.lockWind.addEventListener('click', lockWind);
 els.fire.addEventListener('click', fire);
+els.change.addEventListener('click', changeTarget);
 els.next.addEventListener('click', newRound);
 els.windL.addEventListener('click', () => {
   S.estWindDir = 1;
@@ -1581,29 +1829,27 @@ els.windR.addEventListener('click', () => {
   els.windR.classList.add('active');
   els.windL.classList.remove('active');
 });
-els.range.addEventListener('keydown', e => {
-  if (e.key === 'Enter'){ e.preventDefault(); lockRange(); }
+els.rangeInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); lockRange(); }
 });
-els.windIn.addEventListener('keydown', e => {
-  if (e.key === 'Enter'){ e.preventDefault(); lockWind(); }
+els.windInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); lockWind(); }
 });
 
-function setZoom(idx){
-  if (idx === S.zoomIdx) return;
-  const oldZ = S.zoom;
-  S.zoomIdx = idx;
-  S.zoom    = ZOOMS[idx];
-  const ratio = S.zoom / oldZ;
-  S.panX *= ratio;
-  S.panY *= ratio;
-  [...els.zoomRow.children].forEach((b, i) =>
-    b.classList.toggle('active', i === idx));
-}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 
+/* =========================================================
+   BOOT
+   ========================================================= */
+resize();
+setZoom(0);
+setScopeOn(true);
 newRound();
+if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) {
+  els.lockHint.classList.add('show');
+}
 requestAnimationFrame(loop);
-
-})();
 </script>
 </body>
 </html>
